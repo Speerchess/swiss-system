@@ -655,120 +655,84 @@ export function generateTripleElimination(players: Player[]): Round[] {
 
   // --- C-Bracket (2 Losses) ---
   // Losers of B-bracket go to C-bracket.
-  // C-bracket Round 1 (CR1): Losers of B Round 1 (BR1). Count = P/8.
   const cMatches: MatchWithSources[][] = [];
-  const cr1Matches: MatchWithSources[] = [];
-  for (let i = 0; i < P / 8; i++) {
-    cr1Matches.push({
-      id: `te-c-r1-m${i + 1}`,
-      round: 1,
-      player1Id: '',
-      player2Id: null,
-      result: null,
-      status: 'pending',
-      bracketType: 'c_bracket',
-      p1Source: { type: 'match_loser', id: `te-b-r1-m${i * 2 + 1}` },
-      p2Source: { type: 'match_loser', id: `te-b-r1-m${i * 2 + 2}` },
-    });
-  }
-  if (cr1Matches.length > 0) {
-    cMatches.push(cr1Matches);
-  }
 
-  // C-bracket subsequent rounds:
-  // For each B round from 2 to final B round:
-  // - C Major Round: winners of C Minor vs losers of B Round r.
-  // - C Minor Round: winners of C Major play each other.
-  const finalBRoundNum = (numRounds - 1) * 2;
-  for (let br = 2; br <= finalBRoundNum; br++) {
-    // A B-round has some number of matches. Losers drop to C-bracket.
-    // Let's count B-round matches:
-    // B-bracket matches at index br-1 in bMatches:
-    const bRoundMatches = bMatches[br - 1] || [];
-    const count = bRoundMatches.length;
+  if (P >= 8) {
+    const k = numRounds - 1; // e.g. 2 for P=8
 
-    // Major round in C: Winners of previous C round vs Losers of B Round br.
-    // In C, we only have minor/major if we have enough players.
-    // Let's implement a simple C bracket progression:
-    // CR(2br-2) is Major C Round: Winner of CR(2br-3) vs Loser of BR(br).
-    // Let's build this:
-    const cMajorRoundNum = (br - 1) * 2;
-    const cMajorMatches: MatchWithSources[] = [];
+    // Generate C rounds 1 to k
+    for (let r = 1; r <= k; r++) {
+      const roundMatches: MatchWithSources[] = [];
+      const count = P / Math.pow(2, r + 1); // e.g. 2 for r=1, 1 for r=2 (when P=8)
 
-    // Check if we have a previous C round
-    const prevCRoundIdx = cMajorRoundNum - 2; // index in cMatches
-    const prevCMatches = cMatches[prevCRoundIdx] || [];
-
-    // We can only pair if there's someone in C and someone dropping from B
-    if (prevCMatches.length > 0 && count > 0) {
-      for (let i = 0; i < count; i++) {
-        // Find previous C match winner
-        const prevCId = `te-c-r${cMajorRoundNum - 1}-m${i + 1}`;
-        const bLoserId = `te-b-r${br}-m${count - i}`; // cross match
-
-        cMajorMatches.push({
-          id: `te-c-r${cMajorRoundNum}-m${i + 1}`,
-          round: cMajorRoundNum,
-          player1Id: '',
-          player2Id: null,
-          result: null,
-          status: 'pending',
-          bracketType: 'c_bracket',
-          p1Source: { type: 'match_winner', id: prevCId },
-          p2Source: { type: 'match_loser', id: bLoserId },
-        });
-      }
-      cMatches.push(cMajorMatches);
-
-      if (count > 1) {
-        const cMinorRoundNum = (br - 1) * 2 + 1;
-        const cMinorMatches: MatchWithSources[] = [];
-        for (let i = 0; i < count / 2; i++) {
-          cMinorMatches.push({
-            id: `te-c-r${cMinorRoundNum}-m${i + 1}`,
-            round: cMinorRoundNum,
+      if (r === 1) {
+        // C Round 1: Pairs the count * 2 losers of BR1 vs count * 2 losers of BR2
+        for (let i = 0; i < count; i++) {
+          roundMatches.push({
+            id: `te-c-r1-m${i + 1}`,
+            round: 1,
             player1Id: '',
             player2Id: null,
             result: null,
             status: 'pending',
             bracketType: 'c_bracket',
-            p1Source: { type: 'match_winner', id: `te-c-r${cMinorRoundNum - 1}-m${i * 2 + 1}` },
-            p2Source: { type: 'match_winner', id: `te-c-r${cMinorRoundNum - 1}-m${i * 2 + 2}` },
+            p1Source: { type: 'match_loser', id: `te-b-r1-m${i + 1}` },
+            p2Source: { type: 'match_loser', id: `te-b-r2-m${count - i}` }, // cross match
           });
         }
-        cMatches.push(cMinorMatches);
+      } else {
+        // C Round r (r > 1): Pairs:
+        // - First count * 2 C winners from round r-1
+        // - count losers from BR(2r-1)
+        // - count losers from BR(2r)
+        for (let i = 0; i < count; i++) {
+          // Match A: C winner i vs BR(2r-1) loser i
+          roundMatches.push({
+            id: `te-c-r${r}-m${i + 1}`,
+            round: r,
+            player1Id: '',
+            player2Id: null,
+            result: null,
+            status: 'pending',
+            bracketType: 'c_bracket',
+            p1Source: { type: 'match_winner', id: `te-c-r${r - 1}-m${i + 1}` },
+            p2Source: { type: 'match_loser', id: `te-b-r${2 * r - 1}-m${i + 1}` },
+          });
+
+          // Match B: C winner i + count vs BR(2r) loser count - i
+          roundMatches.push({
+            id: `te-c-r${r}-m${i + 1 + count}`,
+            round: r,
+            player1Id: '',
+            player2Id: null,
+            result: null,
+            status: 'pending',
+            bracketType: 'c_bracket',
+            p1Source: { type: 'match_winner', id: `te-c-r${r - 1}-m${i + 1 + count}` },
+            p2Source: { type: 'match_loser', id: `te-b-r${2 * r}-m${count - i}` },
+          });
+        }
       }
-    } else if (count > 0 && prevCMatches.length === 0) {
-      // If C was empty but B matches are finishing (e.g. for P=4, BR1 has 1 match, CR1 has 0 matches, but BR2 losers drop to CR2)
-      // Here, BR1 losers drop to B-finals, loser of B-finals drops to C.
-      // Let's handle: if there's no previous C round, the losers of B round can play each other directly to start C!
-      // This is exactly what happens in small tournaments.
-      // E.g. for P=4:
-      // A-bracket: 2 rounds (WR1: 2 matches, WR2: 1 match).
-      // B-bracket: BR1 has 1 match (losers of WR1). BR2 (major) has 1 match (winner of BR1 vs loser of WR2).
-      // BR2 is the B-finals. The loser of BR2 has 2 losses, so they drop to C.
-      // Since they are the only player with 2 losses, they wait in C for the B-finals winner?
-      // Wait, A-winner, B-winner, and C-winner.
-      // For P=4, B-winner is winner of BR2. C-winner is loser of BR2 (since they lost in B-bracket but have only 2 losses total!).
-      // So Winner of A, Winner of B, and Loser of B (which is C-winner) play the finals!
-      // This is extremely simple and works automatically!
+      cMatches.push(roundMatches);
     }
+
+    // Finally, run one more C-bracket round (CR k+1) to pair the 2 winners of C Round k down to 1 C winner
+    cMatches.push([{
+      id: `te-c-r${k + 1}-m1`,
+      round: k + 1,
+      player1Id: '',
+      player2Id: null,
+      result: null,
+      status: 'pending',
+      bracketType: 'c_bracket',
+      p1Source: { type: 'match_winner', id: `te-c-r${k}-m1` },
+      p2Source: { type: 'match_winner', id: `te-c-r${k}-m2` },
+    }]);
   }
 
   // --- FINALS STAGE ---
-  // We need the A Winner, B Winner, and C Winner.
-  // 1. A Winner is Winner of `te-a-r${numRounds}-m1`.
-  // 2. B Winner:
-  //    - If P >= 4: Winner of B-finals, which is `te-b-r${finalBRoundNum}-m1`.
-  //    - If P = 2: Winner of BR1, which is `te-b-r1-m1`? Actually, for P=2, B has only 1 player who lost in WR1.
-  // 3. C Winner:
-  //    - If P >= 8: Winner of C-finals, which is `te-c-r${(finalBRoundNum - 1) * 2}-m1`?
-  //      Actually, it's the winner of the very last match in cMatches.
-  //    - If P = 4: C Winner is the loser of B Finals.
-  //    - If P = 2: C Winner is null (not enough players).
-  // Let's identify the final matches of A, B, and C dynamically based on the generated arrays:
   const lastAMatchId = `te-a-r${numRounds}-m1`;
-  
+
   // Find B-winner match: the last round of B
   const lastBMatches = bMatches[bMatches.length - 1] || [];
   const lastBMatchId = lastBMatches.length > 0 ? lastBMatches[0].id : '';
