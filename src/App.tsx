@@ -90,6 +90,7 @@ export default function App() {
       tiebreaks: {
         buchholz: 0,
         medianBuchholz: 0,
+        buchholzCut1: 0,
         sonnebornBerger: 0,
         cumulative: 0,
         directEncounter: 0,

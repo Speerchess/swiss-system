@@ -732,3 +732,85 @@ tr:hover td {
 .app-footer a:hover {
   text-decoration: underline;
 }
+
+/* Inline Edit Input inside table */
+tr input[type="text"],
+tr input[type="number"] {
+  background: var(--bg-input);
+  border: 1px solid var(--color-primary);
+  color: var(--text-primary);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+  outline: none;
+  font-family: var(--font-family-body);
+}
+
+tr input[type="text"]:focus,
+tr input[type="number"]:focus {
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+/* Mobile Responsiveness Improvements */
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .header-actions .btn {
+    flex: 1;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .match-card {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    text-align: center;
+  }
+
+  .player-box.left {
+    align-items: center;
+    text-align: center;
+  }
+
+  .player-box.right {
+    align-items: center;
+    text-align: center;
+  }
+
+  .match-result-selector {
+    margin: 0.5rem 0;
+  }
+  
+  .result-buttons {
+    justify-content: center;
+  }
+
+  .glass-card {
+    padding: 1.25rem;
+  }
+  
+  .tabs {
+    gap: 0.25rem;
+  }
+  
+  .tab-btn {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  
+  /* Make accordion side-by-side flex wrap nicely on mobile */
+  div[style*="display: grid; grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+}
+

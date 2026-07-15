@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Plus, 
   Trash2, 
   ArrowUp, 
   ArrowDown, 
@@ -29,6 +28,7 @@ interface TournamentSetupProps {
 const TIEBREAK_NAMES: Record<TiebreakType, string> = {
   'buchholz': 'Buchholz (부흐홀츠 - 상대 점수 합)',
   'median-buchholz': 'Median Buchholz (미디언 부흐홀츠 - 최고/최저 제외 상대 점수 합)',
+  'buchholz-cut1': 'Buchholz Cut 1 (부흐홀츠 컷 1 - 최저 제외 상대 점수 합)',
   'sonneborn-berger': 'Sonneborn-Berger (손네보른-베르거 - 이긴 상대 점수 + 비긴 상대 점수 0.5배)',
   'cumulative': 'Cumulative (누적 점수 - 라운드별 점수의 합)',
   'direct-encounter': 'Direct Encounter (승자승 - 승자 우선)',
@@ -38,6 +38,7 @@ const TIEBREAK_NAMES: Record<TiebreakType, string> = {
 const DEFAULT_TIEBREAKS: TiebreakType[] = [
   'direct-encounter',
   'buchholz',
+  'buchholz-cut1',
   'sonneborn-berger',
   'rating',
 ];
@@ -48,15 +49,20 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
   
   // Players state
   const [playersList, setPlayersList] = useState<Array<{ name: string; rating?: number }>>([]);
-  const [newPlayerName, setNewPlayerName] = useState('');
-  const [newPlayerRating, setNewPlayerRating] = useState('');
   
+  // Accordion state
+  const [isSetupAccordionOpen, setIsSetupAccordionOpen] = useState(true);
+
   // Quick generate state
   const [quickCount, setQuickCount] = useState('8');
   
   // Bulk paste state
   const [bulkInput, setBulkInput] = useState('');
-  const [showBulkInput, setShowBulkInput] = useState(false);
+
+  // Inline edit state
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editingField, setEditingField] = useState<'name' | 'rating' | null>(null);
+  const [editingValue, setEditingValue] = useState('');
 
   // Tiebreak order state
   const [tiebreakOrder, setTiebreakOrder] = useState<TiebreakType[]>(DEFAULT_TIEBREAKS);
@@ -70,29 +76,39 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
   // Error state
   const [error, setError] = useState('');
 
-  // 1. Add single player
-  const handleAddPlayer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPlayerName.trim()) return;
-
-    const ratingVal = newPlayerRating.trim() ? parseInt(newPlayerRating, 10) : undefined;
-    if (ratingVal !== undefined && isNaN(ratingVal)) {
-      setError('레이팅은 숫자여야 합니다.');
-      return;
-    }
-
-    setPlayersList([...playersList, { name: newPlayerName.trim(), rating: ratingVal }]);
-    setNewPlayerName('');
-    setNewPlayerRating('');
-    setError('');
+  // 1. Start Inline Editing
+  const handleStartEdit = (index: number, field: 'name' | 'rating', value: string) => {
+    setEditingIdx(index);
+    setEditingField(field);
+    setEditingValue(value);
   };
 
-  // 2. Remove player
+  // 2. Save Inline Edit
+  const handleSaveEdit = (index: number) => {
+    if (editingField === null) return;
+    
+    const newList = [...playersList];
+    if (editingField === 'name') {
+      const trimmed = editingValue.trim();
+      if (trimmed) {
+        newList[index].name = trimmed;
+      }
+    } else if (editingField === 'rating') {
+      const parsed = parseInt(editingValue, 10);
+      newList[index].rating = isNaN(parsed) ? undefined : parsed;
+    }
+    
+    setPlayersList(newList);
+    setEditingIdx(null);
+    setEditingField(null);
+  };
+
+  // 3. Remove player
   const handleRemovePlayer = (index: number) => {
     setPlayersList(playersList.filter((_, i) => i !== index));
   };
 
-  // 3. Quick generate generic players by count
+  // 4. Quick generate generic players by count
   const handleQuickGenerate = () => {
     const count = parseInt(quickCount, 10);
     if (isNaN(count) || count < 2) {
@@ -108,7 +124,7 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
     setError('');
   };
 
-  // 4. Parse and import bulk input (names and ratings)
+  // 5. Parse and import bulk input (names and ratings)
   const handleBulkImport = () => {
     if (!bulkInput.trim()) return;
 
@@ -146,11 +162,10 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
 
     setPlayersList([...playersList, ...parsed]);
     setBulkInput('');
-    setShowBulkInput(false);
     setError('');
   };
 
-  // 5. Move tiebreaker rank
+  // 6. Move tiebreaker rank
   const moveTiebreak = (index: number, direction: 'up' | 'down') => {
     const newOrder = [...tiebreakOrder];
     if (direction === 'up' && index > 0) {
@@ -173,17 +188,11 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
     }
   };
 
-  // 6. Submit and Start Tournament
+  // 7. Submit and Start Tournament
   const handleStartTournament = () => {
     if (playersList.length < 2) {
       setError('토너먼트를 시작하려면 최소 2명의 플레이어가 등록되어야 합니다.');
       return;
-    }
-
-    // Validation for elimination tournament counts
-    if (['single', 'double', 'triple'].includes(tournamentType)) {
-      // It's recommended to warn about player count if not power of 2,
-      // but our system automatically handles byes, so it is allowed!
     }
 
     onStart(
@@ -289,90 +298,101 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
             참가자 등록 ({playersList.length}명)
           </h3>
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-            <button 
-              className={`btn ${!showBulkInput ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setShowBulkInput(false)}
-              type="button"
+          {/* Accordion form container */}
+          <div style={{ 
+            border: '1px solid var(--border-light)', 
+            borderRadius: 'var(--border-radius-md)', 
+            padding: '1.25rem', 
+            marginBottom: '1.5rem', 
+            background: 'rgba(0,0,0,0.15)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+          }}>
+            <div 
+              onClick={() => setIsSetupAccordionOpen(!isSetupAccordionOpen)}
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                cursor: 'pointer', 
+                fontWeight: '700',
+                fontSize: '0.95rem',
+                userSelect: 'none',
+                color: 'var(--color-primary-hover)'
+              }}
             >
-              직접 추가
-            </button>
-            <button 
-              className={`btn ${showBulkInput ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setShowBulkInput(true)}
-              type="button"
-            >
-              여러 명 붙여넣기 / 자동 생성
-            </button>
-          </div>
-
-          {!showBulkInput ? (
-            <form onSubmit={handleAddPlayer} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
-              <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
-                <label htmlFor="p-name">이름</label>
-                <input
-                  id="p-name"
-                  type="text"
-                  placeholder="예: 홍길동"
-                  value={newPlayerName}
-                  onChange={(e) => setNewPlayerName(e.target.value)}
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                <label htmlFor="p-rating">레이팅 (선택)</label>
-                <input
-                  id="p-rating"
-                  type="number"
-                  placeholder="예: 1500"
-                  value={newPlayerRating}
-                  onChange={(e) => setNewPlayerRating(e.target.value)}
-                />
-              </div>
-              <button className="btn btn-primary" type="submit" style={{ height: '42px' }}>
-                <Plus size={18} />
-                추가
-              </button>
-            </form>
-          ) : (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div className="form-group">
-                <label>참가자 명단 입력 (줄바꿈으로 구분)</label>
-                <textarea
-                  placeholder="예시 1:&#10;홍길동, 1600&#10;김철수, 1450&#10;이영희&#10;&#10;예시 2:&#10;홍길동 (1600)&#10;김철수 (1450)"
-                  value={bulkInput}
-                  onChange={(e) => setBulkInput(e.target.value)}
-                />
-                <button 
-                  className="btn btn-primary" 
-                  type="button" 
-                  onClick={handleBulkImport}
-                  style={{ marginTop: '0.5rem' }}
-                >
-                  가져오기
-                </button>
-              </div>
-
-              <div className="form-group" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1rem', marginTop: '1rem' }}>
-                <label>인원수로만 자동 생성</label>
-                <div className="quick-generate-box">
-                  <input
-                    type="number"
-                    value={quickCount}
-                    onChange={(e) => setQuickCount(e.target.value)}
-                    min="2"
-                    placeholder="인원수 입력"
-                    style={{ flex: 1 }}
+              <span>참가자 추가 양식 열기/닫기</span>
+              <span>{isSetupAccordionOpen ? '▲ 닫기' : '▼ 열기'}</span>
+            </div>
+            
+            {isSetupAccordionOpen && (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '1.25rem', 
+                marginTop: '1rem', 
+                borderTop: '1px solid var(--border-light)', 
+                paddingTop: '1rem' 
+              }}>
+                {/* 1. Bulk Input */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>명단 입력 (줄바꿈으로 구분)</label>
+                  <textarea
+                    placeholder="예시:&#10;홍길동, 1600&#10;김철수 (1450)&#10;이영희"
+                    value={bulkInput}
+                    onChange={(e) => setBulkInput(e.target.value)}
+                    style={{ minHeight: '80px', fontSize: '0.9rem' }}
                   />
-                  <button className="btn btn-accent" type="button" onClick={handleQuickGenerate}>
-                    자동 생성
+                  <button 
+                    className="btn btn-primary" 
+                    type="button" 
+                    onClick={() => {
+                      handleBulkImport();
+                      setIsSetupAccordionOpen(false);
+                    }}
+                    style={{ marginTop: '0.5rem', width: '100%', padding: '0.6rem' }}
+                  >
+                    명단 가져오기
                   </button>
                 </div>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  입력한 인원수만큼 플레이어 1, 플레이어 2... 형태로 레이팅 없이 생성됩니다.
-                </p>
+                
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
+                  <hr style={{ flex: 1, border: 'none', borderTop: '1px dashed var(--border-light)' }} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>또는</span>
+                  <hr style={{ flex: 1, border: 'none', borderTop: '1px dashed var(--border-light)' }} />
+                </div>
+                
+                {/* 2. Quick Count Generate */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>인원수로만 자동 생성</label>
+                  <div className="quick-generate-box" style={{ marginTop: '0.25rem' }}>
+                    <input
+                      type="number"
+                      value={quickCount}
+                      onChange={(e) => setQuickCount(e.target.value)}
+                      min="2"
+                      placeholder="인원수 입력"
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      className="btn btn-accent" 
+                      type="button" 
+                      onClick={() => {
+                        handleQuickGenerate();
+                        setIsSetupAccordionOpen(false);
+                      }}
+                      style={{ padding: '0.6rem 1.2rem' }}
+                    >
+                      자동 생성
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                    입력한 인원수만큼 플레이어 1, 플레이어 2... 형태로 레이팅 없이 생성됩니다.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* List of current players */}
           {playersList.length > 0 ? (
@@ -381,8 +401,8 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
                 <thead>
                   <tr>
                     <th>번호</th>
-                    <th>이름</th>
-                    <th>레이팅</th>
+                    <th>이름 (수정 가능)</th>
+                    <th>레이팅 (수정 가능)</th>
                     <th style={{ textAlign: 'right' }}>작업</th>
                   </tr>
                 </thead>
@@ -390,8 +410,64 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
                   {playersList.map((player, idx) => (
                     <tr key={idx}>
                       <td style={{ width: '60px' }}>{idx + 1}</td>
-                      <td style={{ fontWeight: '600' }}>{player.name}</td>
-                      <td>{player.rating !== undefined ? player.rating : '-'}</td>
+                      
+                      {/* Name Editing Cell */}
+                      <td style={{ fontWeight: '600' }}>
+                        {editingIdx === idx && editingField === 'name' ? (
+                          <input
+                            type="text"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => handleSaveEdit(idx)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(idx)}
+                            autoFocus
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.9rem', width: '90%' }}
+                          />
+                        ) : (
+                          <span 
+                            onClick={() => handleStartEdit(idx, 'name', player.name)}
+                            style={{ 
+                              cursor: 'pointer', 
+                              borderBottom: '1px dashed var(--text-secondary)',
+                              display: 'inline-block',
+                              minWidth: '80px'
+                            }}
+                            title="클릭하여 수정"
+                          >
+                            {player.name}
+                          </span>
+                        )}
+                      </td>
+                      
+                      {/* Rating Editing Cell */}
+                      <td>
+                        {editingIdx === idx && editingField === 'rating' ? (
+                          <input
+                            type="number"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => handleSaveEdit(idx)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(idx)}
+                            autoFocus
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.9rem', width: '90px' }}
+                            placeholder="레이팅"
+                          />
+                        ) : (
+                          <span 
+                            onClick={() => handleStartEdit(idx, 'rating', player.rating !== undefined ? player.rating.toString() : '')}
+                            style={{ 
+                              cursor: 'pointer', 
+                              borderBottom: '1px dashed var(--text-secondary)',
+                              display: 'inline-block',
+                              minWidth: '40px'
+                            }}
+                            title="클릭하여 수정"
+                          >
+                            {player.rating !== undefined ? player.rating : '-'}
+                          </span>
+                        )}
+                      </td>
+
                       <td style={{ textAlign: 'right', width: '80px' }}>
                         <button
                           className="btn btn-danger btn-icon-only"
@@ -409,7 +485,7 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', border: '1px dashed var(--border-light)', borderRadius: 'var(--border-radius-md)' }}>
-              등록된 플레이어가 없습니다. 참가자를 등록해 주세요.
+              등록된 플레이어가 없습니다. 위 양식을 통해 참가자를 등록해 주세요.
             </div>
           )}
         </div>

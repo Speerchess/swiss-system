@@ -1,5 +1,7 @@
 import type { Player, Round, TiebreakType } from '../logic/types';
 import { comparePlayers } from '../logic/tiebreaks';
+import { toPng } from 'html-to-image';
+import { Camera } from 'lucide-react';
 
 interface StandingsTableProps {
   players: Player[];
@@ -9,9 +11,20 @@ interface StandingsTableProps {
   isCompleted: boolean;
 }
 
+const TIEBREAK_NAMES: Record<TiebreakType, string> = {
+  'buchholz': 'Buchholz',
+  'median-buchholz': 'Median Buchholz',
+  'buchholz-cut1': 'Buchholz Cut 1',
+  'sonneborn-berger': 'Sonneborn-Berger',
+  'cumulative': 'Cumulative',
+  'direct-encounter': 'Direct Encounter',
+  'rating': 'Rating',
+};
+
 const TIEBREAK_SHORT_NAMES: Record<TiebreakType, string> = {
   'buchholz': 'BH',
   'median-buchholz': 'M-BH',
+  'buchholz-cut1': 'BH-C1',
   'sonneborn-berger': 'SB',
   'cumulative': 'CUM',
   'direct-encounter': 'DE',
@@ -21,6 +34,7 @@ const TIEBREAK_SHORT_NAMES: Record<TiebreakType, string> = {
 const TIEBREAK_TOOLTIPS: Record<TiebreakType, string> = {
   'buchholz': 'Buchholz (상대방 점수의 합)',
   'median-buchholz': 'Median Buchholz (최고, 최저를 제외한 상대방 점수의 합)',
+  'buchholz-cut1': 'Buchholz Cut 1 (최저 점수 1개를 제외한 상대방 점수의 합)',
   'sonneborn-berger': 'Sonneborn-Berger (이긴 상대방의 점수 + 비긴 상대방 점수의 절반)',
   'cumulative': 'Cumulative (라운드별 누적 점수의 합)',
   'direct-encounter': 'Direct Encounter (승자승)',
@@ -78,9 +92,57 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     return `${wins}승 - ${draws}무 - ${losses}패`;
   };
 
+  // Export current standings card to PNG
+  const handleDownloadPNG = () => {
+    const node = document.getElementById('standings-card');
+    if (!node) return;
+
+    // Use toPng to capture Standings card
+    toPng(node, {
+      cacheBust: true,
+      backgroundColor: '#060913',
+      style: {
+        borderRadius: '0px',
+      },
+      filter: (domNode: any) => {
+        // Exclude specific action elements like download or withdraw button from image
+        if (domNode.classList && (
+          domNode.classList.contains('btn-download-png') ||
+          domNode.classList.contains('btn') // withdrawal buttons
+        )) {
+          return false;
+        }
+        return true;
+      }
+    })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = isCompleted ? 'final_standings.png' : 'current_standings.png';
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((error) => {
+        console.error('Standings PNG export failed', error);
+      });
+  };
+
   return (
-    <div className="glass-card">
-      <h3 className="section-title">현재 순위</h3>
+    <div className="glass-card" id="standings-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 className="section-title" style={{ marginBottom: 0 }}>
+          {isCompleted ? '최종 순위' : '현재 순위'}
+        </h3>
+        <button
+          className="btn btn-secondary btn-download-png"
+          style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', gap: '0.35rem' }}
+          onClick={handleDownloadPNG}
+          type="button"
+          title="순위표 이미지 다운로드"
+        >
+          <Camera size={14} />
+          이미지 저장
+        </button>
+      </div>
       
       <div className="table-container">
         <table>
@@ -98,7 +160,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
               ))}
               <th>전적 (W-D-L)</th>
               {!isCompleted && onTogglePlayerActive && (
-                <th style={{ textAlign: 'center' }}>상태</th>
+                <th style={{ textAlign: 'center' }} className="btn-download-png">상태</th>
               )}
             </tr>
           </thead>
@@ -150,7 +212,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                     {record}
                   </td>
                   {!isCompleted && onTogglePlayerActive && (
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center' }} className="btn-download-png">
                       <button
                         className={`btn ${player.active ? 'btn-secondary' : 'btn-danger'}`}
                         style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
@@ -172,7 +234,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
         <div><strong>타이브레이크 범례:</strong></div>
         {tiebreakOrder.map(criteria => (
           <div key={criteria}>
-            <strong>{TIEBREAK_SHORT_NAMES[criteria]}:</strong> {TIEBREAK_TOOLTIPS[criteria].split(' (')[0]}
+            <strong>{TIEBREAK_SHORT_NAMES[criteria]}:</strong> {TIEBREAK_NAMES[criteria]}
           </div>
         ))}
       </div>

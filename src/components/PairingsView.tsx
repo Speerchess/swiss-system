@@ -1,5 +1,6 @@
 import type { Match, Player, MatchResult } from '../logic/types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Camera } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface PairingsViewProps {
   roundNumber: number;
@@ -29,11 +30,57 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
 
   const isRoundPending = matches.some((m) => m.status === 'pending');
 
+  // Export pairings card to PNG
+  const handleDownloadPNG = () => {
+    const node = document.getElementById('pairings-card');
+    if (!node) return;
+
+    toPng(node, {
+      cacheBust: true,
+      backgroundColor: '#060913',
+      style: {
+        borderRadius: '0px',
+      },
+      filter: (domNode: any) => {
+        // Exclude specific action elements like result input buttons or download buttons
+        if (domNode.classList && (
+          domNode.classList.contains('btn-download-png') || 
+          domNode.classList.contains('result-buttons') ||
+          domNode.innerText === '결과 수정'
+        )) {
+          return false;
+        }
+        return true;
+      }
+    })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `round_${roundNumber}_pairings.png`;
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((error) => {
+        console.error('Pairings PNG export failed', error);
+      });
+  };
+
   return (
-    <div className="glass-card">
-      <h3 className="section-title">
-        {roundNumber} 라운드 대진
-      </h3>
+    <div className="glass-card" id="pairings-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 className="section-title" style={{ marginBottom: 0 }}>
+          {roundNumber} 라운드 대진
+        </h3>
+        <button
+          className="btn btn-secondary btn-download-png"
+          style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', gap: '0.35rem' }}
+          onClick={handleDownloadPNG}
+          type="button"
+          title="대진표 이미지 다운로드"
+        >
+          <Camera size={14} />
+          이미지 저장
+        </button>
+      </div>
 
       {isCurrentRound && !tournamentCompleted && isRoundPending && (
         <div className="alert alert-info">
@@ -127,7 +174,7 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                       {match.status === 'pending' ? (
                         <span className="result-badge pending">진행 중</span>
                       ) : (
-                        !isCurrentRound && (
+                        (tournamentCompleted || !isCurrentRound) && (
                           <span className="result-badge completed">
                             {match.result === '1-0' ? '백 승' : match.result === '0-1' ? '흑 승' : '무승부'}
                           </span>

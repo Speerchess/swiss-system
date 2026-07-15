@@ -27,6 +27,7 @@ export function calculateTiebreaks(
         tiebreaks: {
           buchholz: 0,
           medianBuchholz: 0,
+          buchholzCut1: 0,
           sonnebornBerger: 0,
           cumulative: 0,
           directEncounter: 0,
@@ -157,6 +158,14 @@ export function calculateTiebreaks(
       medianBuchholz = sortedOppScores.reduce((sum, score) => sum + score, 0);
     }
 
+    // Buchholz Cut 1 (exclude lowest)
+    let buchholzCut1 = buchholzSum;
+    if (opponentScores.length >= 2) {
+      const sortedOppScores = [...opponentScores].sort((a, b) => a - b);
+      sortedOppScores.shift(); // remove lowest opponent score
+      buchholzCut1 = sortedOppScores.reduce((sum, score) => sum + score, 0);
+    }
+
     // Cumulative Score
     const runningScores = runningScoresMap.get(player.id) || [];
     const cumulativeScore = runningScores.reduce((sum, score) => sum + score, 0);
@@ -165,6 +174,7 @@ export function calculateTiebreaks(
     player.tiebreaks = {
       buchholz: buchholzSum,
       medianBuchholz,
+      buchholzCut1,
       sonnebornBerger: sbSum,
       cumulative: cumulativeScore,
       directEncounter: 0, // Direct Encounter is checked dynamically in sorting

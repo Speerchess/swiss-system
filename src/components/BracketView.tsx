@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Round, Player, Match } from '../logic/types';
 import type { MatchWithSources, PlayerSource } from '../logic/elimination';
+import { Camera } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface BracketViewProps {
   rounds: Round[];
@@ -115,9 +117,54 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
     }))
     .filter((r) => r.matches.length > 0);
 
+  // Export bracket card to PNG
+  const handleDownloadPNG = () => {
+    const node = document.getElementById('bracket-card');
+    if (!node) return;
+
+    toPng(node, {
+      cacheBust: true,
+      backgroundColor: '#060913',
+      style: {
+        borderRadius: '0px',
+      },
+      filter: (domNode: any) => {
+        // Exclude specific action elements like buttons
+        if (domNode.classList && (
+          domNode.classList.contains('btn-download-png') || 
+          domNode.classList.contains('bracket-section-selector')
+        )) {
+          return false;
+        }
+        return true;
+      }
+    })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `${type}_elimination_bracket_${selectedSubBracket}.png`;
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((error) => {
+        console.error('Bracket PNG export failed', error);
+      });
+  };
+
   return (
-    <div className="glass-card" style={{ width: '100%' }}>
-      <h3 className="section-title">대진표 (Brackets)</h3>
+    <div className="glass-card" style={{ width: '100%' }} id="bracket-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 className="section-title" style={{ marginBottom: 0 }}>대진표 (Brackets)</h3>
+        <button
+          className="btn btn-secondary btn-download-png"
+          style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', gap: '0.35rem' }}
+          onClick={handleDownloadPNG}
+          type="button"
+          title="대진표 이미지 다운로드"
+        >
+          <Camera size={14} />
+          이미지 저장
+        </button>
+      </div>
 
       {/* Sub-bracket selector buttons */}
       {(hasLosersBracket || hasCBracket) && (
@@ -126,14 +173,14 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
             className={`bracket-sec-btn ${selectedSubBracket === 'winners' ? 'active' : ''}`}
             onClick={() => setSelectedSubBracket('winners')}
           >
-            승자조 (Winners Bracket)
+            승자조 (Winners)
           </button>
           {hasLosersBracket && (
             <button
               className={`bracket-sec-btn ${selectedSubBracket === 'losers' ? 'active' : ''}`}
               onClick={() => setSelectedSubBracket('losers')}
             >
-              패자조 (Losers Bracket)
+              패자조 (Losers)
             </button>
           )}
           {hasCBracket && (
@@ -141,14 +188,14 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
               className={`bracket-sec-btn ${selectedSubBracket === 'c_bracket' ? 'active' : ''}`}
               onClick={() => setSelectedSubBracket('c_bracket')}
             >
-              최종 패자조 (C Bracket)
+              C조 (C Bracket)
             </button>
           )}
           <button
             className={`bracket-sec-btn ${selectedSubBracket === 'finals' ? 'active' : ''}`}
             onClick={() => setSelectedSubBracket('finals')}
           >
-            최종 결승 (Grand Finals)
+            최종 결승 (Finals)
           </button>
         </div>
       )}

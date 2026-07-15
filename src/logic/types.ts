@@ -3,6 +3,7 @@ export type TournamentType = 'swiss' | 'single' | 'double' | 'triple' | 'round-r
 export type TiebreakType =
   | 'buchholz'
   | 'median-buchholz'
+  | 'buchholz-cut1'
   | 'sonneborn-berger'
   | 'cumulative'
   | 'direct-encounter'
@@ -22,6 +23,7 @@ export interface Player {
   tiebreaks: {
     buchholz: number;
     medianBuchholz: number;
+    buchholzCut1: number;
     sonnebornBerger: number;
     cumulative: number;
     directEncounter: number;
