@@ -68,26 +68,22 @@ export function calculateTiebreaks(
       p1.opponents.push(p2.id);
       p2.opponents.push(p1.id);
 
+      // player1Id is always White, player2Id is always Black
+      p1.colors.push('W');
+      p2.colors.push('B');
+
       if (match.result === '1-0') {
         p1.score += settings.pointsPerWin;
         p2.score += settings.pointsPerLoss;
-        p1.colors.push('W');
-        p2.colors.push('B');
       } else if (match.result === '0-1') {
         p1.score += settings.pointsPerLoss;
         p2.score += settings.pointsPerWin;
-        p1.colors.push('B');
-        p2.colors.push('W');
       } else if (match.result === '1/2-1/2') {
         p1.score += settings.pointsPerDraw;
         p2.score += settings.pointsPerDraw;
-        p1.colors.push('W'); // player1 is white
-        p2.colors.push('B'); // player2 is black
       } else if (match.result === '0-0') {
         p1.score += settings.pointsPerLoss;
         p2.score += settings.pointsPerLoss;
-        p1.colors.push('W');
-        p2.colors.push('B');
       }
 
       runningScoresMap.get(p1.id)?.push(p1.score);
