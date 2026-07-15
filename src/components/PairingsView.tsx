@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import type { Match, Player, MatchResult } from '../logic/types';
-import { AlertCircle, Camera } from 'lucide-react';
+import { AlertCircle, Camera, X } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface PairingsViewProps {
@@ -19,13 +20,16 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
   isCurrentRound,
   tournamentCompleted,
 }) => {
+  // Track which match is currently opening its result selector
+  const [activeEditingMatchId, setActiveEditingMatchId] = useState<string | null>(null);
+
   const playerMap = new Map<string, Player>(players.map((p) => [p.id, p]));
 
-  const getPlayerNameAndRating = (playerId: string | null) => {
-    if (!playerId) return { name: 'BYE', rating: undefined };
+  const getPlayerData = (playerId: string | null) => {
+    if (!playerId) return { name: 'BYE', rating: undefined, score: 0 };
     const player = playerMap.get(playerId);
-    if (!player) return { name: '알 수 없음', rating: undefined };
-    return { name: player.name, rating: player.rating };
+    if (!player) return { name: '알 수 없음', rating: undefined, score: 0 };
+    return { name: player.name, rating: player.rating, score: player.score };
   };
 
   const isRoundPending = matches.some((m) => m.status === 'pending');
@@ -37,16 +41,17 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
 
     toPng(node, {
       cacheBust: true,
-      backgroundColor: '#060913',
+      backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
       },
       filter: (domNode: any) => {
-        // Exclude specific action elements like result input buttons or download buttons
+        // Filter out action buttons during capture
         if (domNode.classList && (
           domNode.classList.contains('btn-download-png') || 
           domNode.classList.contains('result-buttons') ||
-          domNode.innerText === '결과 수정'
+          domNode.classList.contains('set-result-btn') ||
+          domNode.tagName === 'BUTTON'
         )) {
           return false;
         }
@@ -64,11 +69,16 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
       });
   };
 
+  const handleResultClick = (matchId: string, result: MatchResult) => {
+    onEnterResult(matchId, result);
+    setActiveEditingMatchId(null);
+  };
+
   return (
     <div className="glass-card" id="pairings-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h3 className="section-title" style={{ marginBottom: 0 }}>
-          {roundNumber} 라운드 대진
+          Round #{roundNumber} 대진 및 결과
         </h3>
         <button
           className="btn btn-secondary btn-download-png"
@@ -94,109 +104,142 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
           대진표가 비어 있습니다.
         </div>
       ) : (
-        <div className="pairings-list">
-          {matches.map((match) => {
-            const p1 = getPlayerNameAndRating(match.player1Id);
-            const p2 = getPlayerNameAndRating(match.player2Id);
-            const isBye = match.player2Id === null;
+        <div className="pairings-table-container">
+          <table className="pairings-table">
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'center', width: '60px' }}>Pair</th>
+                <th style={{ textAlign: 'right', paddingRight: '1.5rem' }}>White Player</th>
+                <th style={{ textAlign: 'center', width: '70px' }}>Pts</th>
+                <th style={{ textAlign: 'center', width: '180px' }}>Result</th>
+                <th style={{ textAlign: 'center', width: '70px' }}>Pts</th>
+                <th style={{ textAlign: 'left', paddingLeft: '1.5rem' }}>Black Player</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matches.map((match, idx) => {
+                const p1 = getPlayerData(match.player1Id);
+                const p2 = getPlayerData(match.player2Id);
+                const isBye = match.player2Id === null;
+                const isEditing = activeEditingMatchId === match.id;
 
-            return (
-              <div 
-                key={match.id} 
-                className={`match-card ${isBye ? 'bye' : ''}`}
-              >
-                {/* Player 1 (White / Higher seed) */}
-                <div className="player-box left">
-                  <span className="player-name">{p1.name}</span>
-                  {p1.rating !== undefined && (
-                    <span className="player-rating">Rating: {p1.rating}</span>
-                  )}
-                  {!isBye && (
-                    <span className="player-color-badge color-w">White</span>
-                  )}
-                </div>
+                return (
+                  <tr key={match.id}>
+                    {/* Pair number */}
+                    <td style={{ textAlign: 'center', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                      {idx + 1}
+                    </td>
 
-                {/* Match Result Selector */}
-                <div className="match-result-selector">
-                  {isBye ? (
-                    <span className="result-badge completed">부전승 (BYE)</span>
-                  ) : (
-                    <>
-                      <div className="result-buttons">
-                        <button
-                          className={`btn-result ${
-                            match.result === '1-0' ? 'selected' : ''
-                          }`}
-                          onClick={() =>
-                            isCurrentRound && !tournamentCompleted && onEnterResult(match.id, '1-0')
-                          }
-                          disabled={!isCurrentRound || tournamentCompleted}
-                          title="백 승리"
-                        >
-                          1 - 0
-                        </button>
-                        <button
-                          className={`btn-result ${
-                            match.result === '1/2-1/2' ? 'selected' : ''
-                          }`}
-                          onClick={() =>
-                            isCurrentRound && !tournamentCompleted && onEnterResult(match.id, '1/2-1/2')
-                          }
-                          disabled={!isCurrentRound || tournamentCompleted}
-                          title="무승부"
-                        >
-                          ½ - ½
-                        </button>
-                        <button
-                          className={`btn-result ${
-                            match.result === '0-1' ? 'selected' : ''
-                          }`}
-                          onClick={() =>
-                            isCurrentRound && !tournamentCompleted && onEnterResult(match.id, '0-1')
-                          }
-                          disabled={!isCurrentRound || tournamentCompleted}
-                          title="흑 승리"
-                        >
-                          0 - 1
-                        </button>
-                      </div>
-                      
-                      {isCurrentRound && !tournamentCompleted && match.status === 'completed' && (
-                        <button
-                          className="btn-result"
-                          style={{ border: 'none', background: 'transparent', textDecoration: 'underline', fontSize: '0.7rem', padding: 0 }}
-                          onClick={() => onEnterResult(match.id, null)}
-                        >
-                          결과 수정
-                        </button>
+                    {/* White Player */}
+                    <td style={{ textAlign: 'right', fontWeight: '600', paddingRight: '1.5rem' }}>
+                      {p1.name}
+                      {p1.rating !== undefined && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem', fontWeight: 'normal' }}>
+                          ({p1.rating})
+                        </span>
                       )}
+                    </td>
 
-                      {match.status === 'pending' ? (
-                        <span className="result-badge pending">진행 중</span>
+                    {/* White Player Pts */}
+                    <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      {p1.score.toFixed(1)}
+                    </td>
+
+                    {/* Result cell */}
+                    <td style={{ textAlign: 'center' }}>
+                      {isBye ? (
+                        <span style={{ fontWeight: '700', color: 'var(--color-success-hover)', fontSize: '0.85rem' }}>
+                          1 - 0 (부전승)
+                        </span>
                       ) : (
-                        (tournamentCompleted || !isCurrentRound) && (
-                          <span className="result-badge completed">
-                            {match.result === '1-0' ? '백 승' : match.result === '0-1' ? '흑 승' : '무승부'}
-                          </span>
-                        )
+                        <>
+                          {isCurrentRound && !tournamentCompleted ? (
+                            isEditing ? (
+                              <div className="result-buttons" style={{ justifyContent: 'center', alignItems: 'center', gap: '0.25rem' }}>
+                                <button
+                                  className="btn-result"
+                                  onClick={() => handleResultClick(match.id, '1-0')}
+                                  title="백 승 (1-0)"
+                                >
+                                  1-0
+                                </button>
+                                <button
+                                  className="btn-result"
+                                  onClick={() => handleResultClick(match.id, '1/2-1/2')}
+                                  title="무승부 (½-½)"
+                                >
+                                  ½-½
+                                </button>
+                                <button
+                                  className="btn-result"
+                                  onClick={() => handleResultClick(match.id, '0-1')}
+                                  title="흑 승 (0-1)"
+                                >
+                                  0-1
+                                </button>
+                                <button
+                                  className="btn-result"
+                                  style={{ padding: '0.35rem', display: 'flex', alignItems: 'center', background: '#fee2e2', borderColor: '#fca5a5' }}
+                                  onClick={() => setActiveEditingMatchId(null)}
+                                  title="취소"
+                                >
+                                  <X size={12} style={{ color: '#ef4444' }} />
+                                </button>
+                              </div>
+                            ) : (
+                              match.status === 'completed' && match.result ? (
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span className="result-cell-completed">
+                                    {match.result === '1/2-1/2' ? '½ - ½' : match.result}
+                                  </span>
+                                  <button
+                                    className="set-result-btn"
+                                    onClick={() => setActiveEditingMatchId(match.id)}
+                                    style={{ fontSize: '0.75rem' }}
+                                  >
+                                    수정
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  className="set-result-btn"
+                                  onClick={() => setActiveEditingMatchId(match.id)}
+                                >
+                                  set result
+                                </button>
+                              )
+                            )
+                          ) : (
+                            <span className="result-cell-completed">
+                              {match.status === 'completed' && match.result
+                                ? (match.result === '1/2-1/2' ? '½ - ½' : match.result)
+                                : '진행 중'
+                              }
+                            </span>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
+                    </td>
 
-                {/* Player 2 (Black / Lower seed) */}
-                <div className="player-box right">
-                  <span className="player-name">{p2.name}</span>
-                  {p2.rating !== undefined && (
-                    <span className="player-rating">Rating: {p2.rating}</span>
-                  )}
-                  {!isBye && (
-                    <span className="player-color-badge color-b">Black</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                    {/* Black Player Pts */}
+                    <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      {isBye ? '-' : p2.score.toFixed(1)}
+                    </td>
+
+                    {/* Black Player */}
+                    <td style={{ textAlign: 'left', fontWeight: '600', paddingLeft: '1.5rem', color: isBye ? 'var(--text-muted)' : 'inherit' }}>
+                      {p2.name}
+                      {!isBye && p2.rating !== undefined && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem', fontWeight: 'normal' }}>
+                          ({p2.rating})
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
-import type { Player, Round, TiebreakType } from '../logic/types';
+import React from 'react';
+import type { Player, Round, TiebreakType, MatchResult } from '../logic/types';
 import { comparePlayers } from '../logic/tiebreaks';
 import { toPng } from 'html-to-image';
 import { Camera } from 'lucide-react';
@@ -11,20 +12,10 @@ interface StandingsTableProps {
   isCompleted: boolean;
 }
 
-const TIEBREAK_NAMES: Record<TiebreakType, string> = {
-  'buchholz': 'Buchholz',
-  'median-buchholz': 'Median Buchholz',
-  'buchholz-cut1': 'Buchholz Cut 1',
-  'sonneborn-berger': 'Sonneborn-Berger',
-  'cumulative': 'Cumulative',
-  'direct-encounter': 'Direct Encounter',
-  'rating': 'Rating',
-};
-
 const TIEBREAK_SHORT_NAMES: Record<TiebreakType, string> = {
-  'buchholz': 'BH',
+  'buchholz': 'BucT',
   'median-buchholz': 'M-BH',
-  'buchholz-cut1': 'BH-C1',
+  'buchholz-cut1': 'Buc1',
   'sonneborn-berger': 'SB',
   'cumulative': 'CUM',
   'direct-encounter': 'DE',
@@ -33,13 +24,107 @@ const TIEBREAK_SHORT_NAMES: Record<TiebreakType, string> = {
 
 const TIEBREAK_TOOLTIPS: Record<TiebreakType, string> = {
   'buchholz': 'Buchholz (상대방 점수의 합)',
-  'median-buchholz': 'Median Buchholz (최고, 최저를 제외한 상대방 점수의 합)',
-  'buchholz-cut1': 'Buchholz Cut 1 (최저 점수 1개를 제외한 상대방 점수의 합)',
-  'sonneborn-berger': 'Sonneborn-Berger (이긴 상대방의 점수 + 비긴 상대방 점수의 절반)',
+  'median-buchholz': 'Median Buchholz (최고·최저 제외 상대 점수 합)',
+  'buchholz-cut1': 'Buchholz Cut 1 (최저 1개 제외 상대 점수 합)',
+  'sonneborn-berger': 'Sonneborn-Berger (이긴 상대 점수 + 비긴 상대 점수×0.5)',
   'cumulative': 'Cumulative (라운드별 누적 점수의 합)',
   'direct-encounter': 'Direct Encounter (승자승)',
   'rating': 'Rating (본인 레이팅)',
 };
+
+/**
+ * Build round-by-round result notation for a given player.
+ * Format examples: +W3, =B2, -W1, +BYE
+ *   +  = win
+ *   =  = draw
+ *   -  = loss
+ *   W/B = color played (White / Black)
+ *   number = opponent's current POSITION (rank) in the standings
+ */
+function buildRoundResults(
+  player: Player,
+  rounds: Round[],
+  sortedPlayers: Player[]
+): Array<{ text: string; cssClass: string }> {
+  // Build a map from playerId -> current position (1-based)
+  const positionMap = new Map<string, number>();
+  sortedPlayers.forEach((p, idx) => positionMap.set(p.id, idx + 1));
+
+  const results: Array<{ text: string; cssClass: string }> = [];
+
+  for (const round of rounds) {
+    let found = false;
+
+    for (const match of round.matches) {
+      const isP1 = match.player1Id === player.id;
+      const isP2 = match.player2Id === player.id;
+
+      if (!isP1 && !isP2) continue;
+      found = true;
+
+      // Handle bye
+      if (match.player2Id === null && isP1) {
+        results.push({ text: '+BYE', cssClass: 'round-result-bye' });
+        break;
+      }
+
+      if (match.status !== 'completed' || match.result === null) {
+        results.push({ text: '...', cssClass: '' });
+        break;
+      }
+
+      // Determine color played by this player
+      // player1Id = White, player2Id = Black
+      const color = isP1 ? 'W' : 'B';
+      
+      // Opponent's id
+      const opponentId = isP1 ? match.player2Id! : match.player1Id;
+      const opponentPos = positionMap.get(opponentId) ?? '?';
+
+      // Determine result symbol for this player
+      let symbol: string;
+      let cssClass: string;
+
+      const result = match.result as MatchResult;
+      if (result === '1-0') {
+        // White wins
+        if (isP1) {
+          symbol = '+';
+          cssClass = 'round-result-win';
+        } else {
+          symbol = '-';
+          cssClass = 'round-result-loss';
+        }
+      } else if (result === '0-1') {
+        // Black wins
+        if (isP2) {
+          symbol = '+';
+          cssClass = 'round-result-win';
+        } else {
+          symbol = '-';
+          cssClass = 'round-result-loss';
+        }
+      } else if (result === '1/2-1/2') {
+        symbol = '=';
+        cssClass = 'round-result-draw';
+      } else {
+        // '0-0' double loss or unknown
+        symbol = '-';
+        cssClass = 'round-result-loss';
+      }
+
+      results.push({ text: `${symbol}${color}${opponentPos}`, cssClass });
+      break;
+    }
+
+    if (!found) {
+      // Player didn't participate in this round (withdrawn, etc.)
+      results.push({ text: '-', cssClass: 'round-result-loss' });
+    }
+  }
+
+  return results;
+}
 
 export const StandingsTable: React.FC<StandingsTableProps> = ({
   players,
@@ -53,62 +138,40 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     comparePlayers(a, b, tiebreakOrder, rounds)
   );
 
-  // Helper to count W-D-L record
-  const getPlayerRecord = (playerId: string) => {
-    let wins = 0;
-    let draws = 0;
-    let losses = 0;
-
-    for (const round of rounds) {
-      for (const match of round.matches) {
-        if (match.status !== 'completed') continue;
-
-        if (match.player1Id === playerId) {
-          if (match.player2Id === null) {
-            wins++; // Bye is a win
-          } else if (match.result === '1-0') {
-            wins++;
-          } else if (match.result === '0-1') {
-            losses++;
-          } else if (match.result === '1/2-1/2') {
-            draws++;
-          } else if (match.result === '0-0') {
-            losses++;
-          }
-        } else if (match.player2Id === playerId) {
-          if (match.result === '0-1') {
-            wins++;
-          } else if (match.result === '1-0') {
-            losses++;
-          } else if (match.result === '1/2-1/2') {
-            draws++;
-          } else if (match.result === '0-0') {
-            losses++;
-          }
-        }
+  // Compute position numbers (handle ties - same rank for equal scores)
+  const positions: string[] = [];
+  sortedPlayers.forEach((player, idx) => {
+    if (idx === 0) {
+      positions.push('1');
+    } else {
+      const prev = sortedPlayers[idx - 1];
+      if (player.score === prev.score) {
+        // Check if tiebreaks are identical (simplified: just use same position text)
+        positions.push(positions[idx - 1]);
+      } else {
+        positions.push((idx + 1).toString());
       }
     }
+  });
 
-    return `${wins}승 - ${draws}무 - ${losses}패`;
-  };
+  // Get completed rounds (only show round columns for rounds that exist)
+  const completedOrActiveRounds = rounds.filter(r => r.matches.length > 0);
 
   // Export current standings card to PNG
   const handleDownloadPNG = () => {
     const node = document.getElementById('standings-card');
     if (!node) return;
 
-    // Use toPng to capture Standings card
     toPng(node, {
       cacheBust: true,
-      backgroundColor: '#060913',
+      backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
       },
       filter: (domNode: any) => {
-        // Exclude specific action elements like download or withdraw button from image
         if (domNode.classList && (
           domNode.classList.contains('btn-download-png') ||
-          domNode.classList.contains('btn') // withdrawal buttons
+          domNode.classList.contains('btn')
         )) {
           return false;
         }
@@ -130,7 +193,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     <div className="glass-card" id="standings-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h3 className="section-title" style={{ marginBottom: 0 }}>
-          {isCompleted ? '최종 순위' : '현재 순위'}
+          {isCompleted ? '🏆 최종 순위' : '현재 순위'}
         </h3>
         <button
           className="btn btn-secondary btn-download-png"
@@ -148,17 +211,21 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
         <table>
           <thead>
             <tr>
-              <th className="rank-cell">순위</th>
-              <th>이름</th>
-              <th>레이팅</th>
-              <th>승점 (Score)</th>
-              {/* Render header columns for active tiebreaks */}
+              <th style={{ textAlign: 'center', width: '60px' }}>Position</th>
+              <th>Name</th>
+              <th style={{ textAlign: 'center' }}>Points</th>
+              {/* Round-by-round result columns */}
+              {completedOrActiveRounds.map((round) => (
+                <th key={round.roundNumber} style={{ textAlign: 'center' }} title={`${round.roundNumber} 라운드 결과`}>
+                  Round #{round.roundNumber}
+                </th>
+              ))}
+              {/* Tiebreak columns */}
               {tiebreakOrder.map((criteria) => (
-                <th key={criteria} title={TIEBREAK_TOOLTIPS[criteria]}>
+                <th key={criteria} style={{ textAlign: 'center' }} title={TIEBREAK_TOOLTIPS[criteria]}>
                   {TIEBREAK_SHORT_NAMES[criteria]}
                 </th>
               ))}
-              <th>전적 (W-D-L)</th>
               {!isCompleted && onTogglePlayerActive && (
                 <th style={{ textAlign: 'center' }} className="btn-download-png">상태</th>
               )}
@@ -166,21 +233,31 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
           </thead>
           <tbody>
             {sortedPlayers.map((player, idx) => {
-              const record = getPlayerRecord(player.id);
-              
+              const roundResults = buildRoundResults(player, completedOrActiveRounds, sortedPlayers);
+
               return (
                 <tr 
                   key={player.id} 
                   style={{ opacity: player.active ? 1 : 0.5 }}
                 >
-                  <td className="rank-cell">{idx + 1}</td>
-                  <td style={{ fontWeight: '700' }}>
+                  <td style={{ textAlign: 'center', fontWeight: '700' }}>
+                    {positions[idx]}
+                    {positions[idx] !== (idx + 1).toString() && idx > 0 && positions[idx] === positions[idx - 1] && (
+                      <span></span>
+                    )}
+                  </td>
+                  <td style={{ fontWeight: '600' }}>
                     {player.name}
+                    {player.rating !== undefined && (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                        ({player.rating})
+                      </span>
+                    )}
                     {!player.active && (
                       <span style={{ 
                         fontSize: '0.7rem', 
-                        background: 'var(--color-danger-bg)', 
-                        color: 'var(--color-danger-hover)',
+                        background: '#fce4ec', 
+                        color: '#c62828',
                         padding: '0.1rem 0.3rem',
                         borderRadius: '4px',
                         marginLeft: '0.5rem',
@@ -190,27 +267,35 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                       </span>
                     )}
                   </td>
-                  <td>{player.rating !== undefined ? player.rating : '-'}</td>
-                  <td style={{ fontWeight: '800', color: 'var(--color-primary-hover)' }}>
-                    {player.score.toFixed(1).replace('.0', '')}
+                  <td style={{ textAlign: 'center', fontWeight: '800', fontSize: '1rem' }}>
+                    {player.score % 1 === 0 ? player.score.toFixed(1) : player.score.toFixed(1)}
                   </td>
-                  {/* Render tiebreak scores */}
+                  {/* Round-by-round notation cells */}
+                  {roundResults.map((rr, rIdx) => (
+                    <td key={rIdx} style={{ textAlign: 'center', fontWeight: '600', fontSize: '0.85rem' }}>
+                      <span className={rr.cssClass}>{rr.text}</span>
+                    </td>
+                  ))}
+                  {/* Pad missing round cells if player has fewer results than rounds */}
+                  {completedOrActiveRounds.length > roundResults.length && (
+                    Array.from({ length: completedOrActiveRounds.length - roundResults.length }).map((_, i) => (
+                      <td key={`pad-${i}`} style={{ textAlign: 'center' }}>-</td>
+                    ))
+                  )}
+                  {/* Tiebreak value cells */}
                   {tiebreakOrder.map((criteria) => {
                     if (criteria === 'direct-encounter') {
-                      return <td key={criteria}>-</td>; // pairwise, shown as - in table
+                      return <td key={criteria} style={{ textAlign: 'center' }}>-</td>;
                     }
                     const val = player.tiebreaks[criteria as keyof typeof player.tiebreaks];
                     return (
-                      <td key={criteria}>
-                        {typeof val === 'number' 
-                          ? val.toFixed(2).replace('.00', '').replace(/(\.0)$/, '') 
+                      <td key={criteria} style={{ textAlign: 'center' }}>
+                        {typeof val === 'number'
+                          ? val.toFixed(1)
                           : '-'}
                       </td>
                     );
                   })}
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {record}
-                  </td>
                   {!isCompleted && onTogglePlayerActive && (
                     <td style={{ textAlign: 'center' }} className="btn-download-png">
                       <button
@@ -228,15 +313,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
             })}
           </tbody>
         </table>
-      </div>
-      
-      <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-        <div><strong>타이브레이크 범례:</strong></div>
-        {tiebreakOrder.map(criteria => (
-          <div key={criteria}>
-            <strong>{TIEBREAK_SHORT_NAMES[criteria]}:</strong> {TIEBREAK_NAMES[criteria]}
-          </div>
-        ))}
       </div>
     </div>
   );
