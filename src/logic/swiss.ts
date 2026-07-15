@@ -128,13 +128,47 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
 
 type PairWithColors = { p1: Player; p2: Player; whiteId: string; blackId: string };
 
-// Backtracking solver using candidate priorities to match score groups and split halves
+/**
+ * Try to find a legal color assignment for a pair of players.
+ * Progressively relaxes color constraints (level 1 → 2 → 3) within the pair
+ * so that same-score pairings are NEVER rejected due to color issues.
+ * Returns the best legal color assignment, or null only as absolute last resort.
+ */
+function findLegalColors(p1: Player, p2: Player): { whiteId: string; blackId: string } {
+  const [preferredWhiteId, preferredBlackId] = determineColors(p1, p2);
+  const colorOptions: [string, string][] = [
+    [preferredWhiteId, preferredBlackId],
+    [preferredBlackId, preferredWhiteId], // swapped
+  ];
+
+  // Try each constraint level: strict → relaxed → fully relaxed
+  for (const level of [1, 2, 3] as const) {
+    for (const [whiteId, blackId] of colorOptions) {
+      const p1Color: 'W' | 'B' = whiteId === p1.id ? 'W' : 'B';
+      const p2Color: 'W' | 'B' = whiteId === p2.id ? 'W' : 'B';
+      if (
+        isColorAssignmentLegal(p1, p1Color, level) &&
+        isColorAssignmentLegal(p2, p2Color, level)
+      ) {
+        return { whiteId, blackId };
+      }
+    }
+  }
+
+  // Absolute fallback: use preferred colors regardless
+  return { whiteId: preferredWhiteId, blackId: preferredBlackId };
+}
+
+/**
+ * Backtracking solver that prioritizes same-score pairings above all else.
+ * Color constraints are resolved per-pair using progressive relaxation,
+ * so color issues NEVER cause same-score opponents to be skipped.
+ */
 function solvePairings(
   players: Player[],
   index: number,
   paired: Set<string>,
   pairs: PairWithColors[],
-  colorConstraintLevel: 1 | 2 | 3,
   avoidReplays: boolean
 ): PairWithColors[] | null {
   if (index >= players.length) {
@@ -143,16 +177,16 @@ function solvePairings(
 
   const p1 = players[index];
   if (paired.has(p1.id)) {
-    return solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
+    return solvePairings(players, index + 1, paired, pairs, avoidReplays);
   }
 
   // Get all active, unpaired candidates
   const candidates = players.filter((p) => p.id !== p1.id && !paired.has(p.id));
 
   // Sort candidates by preference:
-  // 1. Same score group, counterpart (split-half counterpart)
+  // 1. Same score group, counterpart (split-half counterpart) → highest priority
   // 2. Same score group, others
-  // 3. Floaters (score difference * 10 penalty)
+  // 3. Adjacent score groups (floaters)
   const getCandidatePriority = (p2: Player) => {
     const scoreDiff = Math.abs(p1.score - p2.score);
     
@@ -190,44 +224,28 @@ function solvePairings(
   });
 
   for (const p2 of sortedCandidates) {
-    // Rule 0: No replays
+    // Rule: No replays (if enabled)
     if (avoidReplays && havePlayed(p1, p2.id)) {
       continue;
     }
 
-    // Try both color assignments: preferred first, then swapped
-    const [preferredWhiteId, preferredBlackId] = determineColors(p1, p2);
-    const colorOptions: [string, string][] = [
-      [preferredWhiteId, preferredBlackId],
-      [preferredBlackId, preferredWhiteId], // swapped
-    ];
+    // Find the best legal color assignment (progressively relaxes constraints)
+    const colors = findLegalColors(p1, p2);
 
-    for (const [whiteId, blackId] of colorOptions) {
-      const p1Color: 'W' | 'B' = whiteId === p1.id ? 'W' : 'B';
-      const p2Color: 'W' | 'B' = whiteId === p2.id ? 'W' : 'B';
+    // Choose pairing
+    paired.add(p1.id);
+    paired.add(p2.id);
+    pairs.push({ p1, p2, whiteId: colors.whiteId, blackId: colors.blackId });
 
-      if (
-        !isColorAssignmentLegal(p1, p1Color, colorConstraintLevel) ||
-        !isColorAssignmentLegal(p2, p2Color, colorConstraintLevel)
-      ) {
-        continue; // Try the other color assignment
-      }
-
-      // Choose pairing
-      paired.add(p1.id);
-      paired.add(p2.id);
-      pairs.push({ p1, p2, whiteId, blackId });
-
-      const result = solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
-      if (result !== null) {
-        return result;
-      }
-
-      // Backtrack
-      paired.delete(p1.id);
-      paired.delete(p2.id);
-      pairs.pop();
+    const result = solvePairings(players, index + 1, paired, pairs, avoidReplays);
+    if (result !== null) {
+      return result;
     }
+
+    // Backtrack
+    paired.delete(p1.id);
+    paired.delete(p2.id);
+    pairs.pop();
   }
 
   return null;
@@ -305,23 +323,13 @@ export function generateSwissPairings(
       }
     }
   } else {
-    // ROUND 2+: Backtracking pairings solver
-    // Level 1: Strict color difference & Strict consecutive limit (max 2 consecutive same color)
-    solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 1, true);
+    // ROUND 2+: Backtracking solver with per-pair color relaxation
+    // Try with replay avoidance first
+    solvedPairs = solvePairings(playersToPair, 0, new Set(), [], true);
 
     if (solvedPairs === null) {
-      // Level 2: Relax color difference, but strictly forbid same color 3 times
-      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 2, true);
-    }
-
-    if (solvedPairs === null) {
-      // Level 3: Relax all color constraints to avoid replays
-      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 3, true);
-    }
-
-    if (solvedPairs === null) {
-      // Level 4: Relax replays (absolute emergency fallback)
-      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 3, false);
+      // Relax replay constraint (emergency fallback)
+      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], false);
     }
   }
 
