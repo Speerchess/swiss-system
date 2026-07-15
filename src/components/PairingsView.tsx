@@ -34,45 +34,58 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
 
   const isRoundPending = matches.some((m) => m.status === 'pending');
 
-  // Export pairings card to PNG using off-screen cloning
+  // Export pairings card to PNG
   const handleDownloadPNG = () => {
-    const originalNode = document.getElementById('pairings-card');
-    if (!originalNode) return;
+    const node = document.getElementById('pairings-card');
+    if (!node) return;
 
-    // Clone the node
-    const clone = originalNode.cloneNode(true) as HTMLElement;
-    
-    // Remove action buttons from clone
-    const elementsToRemove = clone.querySelectorAll('.btn-download-png, .result-buttons, .set-result-btn, button');
-    elementsToRemove.forEach(el => el.remove());
+    const tableContainer = node.querySelector('.pairings-table-container') as HTMLElement;
+    const table = node.querySelector('table') as HTMLElement;
 
-    const table = clone.querySelector('table') as HTMLElement;
-    const tableContainer = clone.querySelector('.pairings-table-container') as HTMLElement;
+    // Expand to fit full scrollable width of the table during capture
+    const scrollWidth = table ? table.scrollWidth : node.scrollWidth;
+    const fullWidth = Math.max(node.clientWidth, scrollWidth + 48);
+    const fullHeight = node.scrollHeight;
 
-    // Get actual table width
-    const scrollWidth = table ? table.scrollWidth : originalNode.scrollWidth;
-    const fullWidth = Math.max(originalNode.clientWidth, scrollWidth + 48);
-
-    // Style the clone off-screen
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '-9999px';
-    clone.style.width = `${fullWidth}px`;
-    clone.style.maxWidth = 'none';
+    // Temporarily style the elements directly
+    const originalOverflowX = tableContainer ? tableContainer.style.overflowX : '';
+    const originalWidth = tableContainer ? tableContainer.style.width : '';
+    const originalMaxWidth = tableContainer ? tableContainer.style.maxWidth : '';
+    const originalNodeWidth = node.style.width;
+    const originalNodeMaxWidth = node.style.maxWidth;
 
     if (tableContainer) {
       tableContainer.style.overflowX = 'visible';
-      tableContainer.style.width = '100%';
+      tableContainer.style.width = 'auto';
       tableContainer.style.maxWidth = 'none';
     }
 
-    document.body.appendChild(clone);
+    node.style.width = `${fullWidth}px`;
+    node.style.maxWidth = 'none';
 
-    toPng(clone, {
+    toPng(node, {
       cacheBust: true,
       backgroundColor: '#ffffff',
+      width: fullWidth,
+      height: fullHeight,
       style: {
         borderRadius: '0px',
+        width: `${fullWidth}px`,
+        height: `${fullHeight}px`,
+        transform: 'scale(1)',
+        transformOrigin: 'top left',
+      },
+      filter: (domNode: any) => {
+        // Exclude download button, result selectors, or modification buttons from the image
+        if (domNode.classList && (
+          domNode.classList.contains('btn-download-png') || 
+          domNode.classList.contains('result-buttons') ||
+          domNode.classList.contains('set-result-btn') ||
+          domNode.tagName === 'BUTTON'
+        )) {
+          return false;
+        }
+        return true;
       }
     })
       .then((dataUrl) => {
@@ -85,7 +98,14 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
         console.error('Pairings PNG export failed', error);
       })
       .finally(() => {
-        document.body.removeChild(clone);
+        // Restore styles
+        if (tableContainer) {
+          tableContainer.style.overflowX = originalOverflowX;
+          tableContainer.style.width = originalWidth;
+          tableContainer.style.maxWidth = originalMaxWidth;
+        }
+        node.style.width = originalNodeWidth;
+        node.style.maxWidth = originalNodeMaxWidth;
       });
   };
 

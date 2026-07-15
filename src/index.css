@@ -69,9 +69,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* App Container Layout */
 .app-container {
-  max-width: 1280px;
+  max-width: 1480px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -271,7 +271,7 @@ textarea {
 /* Dashboard Layout */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1.5fr;
+  grid-template-columns: 1.1fr 1.5fr;
   gap: 1.5rem;
   width: 100%;
 }

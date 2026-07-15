@@ -126,22 +126,34 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
     const bracketContainer = node.querySelector('.bracket-container') as HTMLElement;
 
     // Expand to fit full scrollable width of the bracket during capture
-    const fullWidth = bracketContainer ? Math.max(node.clientWidth, bracketContainer.scrollWidth + 40) : node.clientWidth;
+    const scrollWidth = bracketContainer ? bracketContainer.scrollWidth : node.scrollWidth;
+    const fullWidth = Math.max(node.clientWidth, scrollWidth + 48);
+    const fullHeight = node.scrollHeight;
 
     const originalOverflow = bracketOuter ? bracketOuter.style.overflow : '';
     const originalWidth = bracketOuter ? bracketOuter.style.width : '';
+    const originalNodeWidth = node.style.width;
+    const originalNodeMaxWidth = node.style.maxWidth;
 
     if (bracketOuter) {
       bracketOuter.style.overflow = 'visible';
       bracketOuter.style.width = 'auto';
     }
 
+    node.style.width = `${fullWidth}px`;
+    node.style.maxWidth = 'none';
+
     toPng(node, {
       cacheBust: true,
       backgroundColor: '#ffffff',
+      width: fullWidth,
+      height: fullHeight,
       style: {
         borderRadius: '0px',
         width: `${fullWidth}px`,
+        height: `${fullHeight}px`,
+        transform: 'scale(1)',
+        transformOrigin: 'top left',
       },
       filter: (domNode: any) => {
         // Exclude specific action elements like buttons
@@ -168,6 +180,8 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
           bracketOuter.style.overflow = originalOverflow;
           bracketOuter.style.width = originalWidth;
         }
+        node.style.width = originalNodeWidth;
+        node.style.maxWidth = originalNodeMaxWidth;
       });
   };
 
