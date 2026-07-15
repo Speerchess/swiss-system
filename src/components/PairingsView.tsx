@@ -39,11 +39,26 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
     const node = document.getElementById('pairings-card');
     if (!node) return;
 
+    const tableContainer = node.querySelector('.pairings-table-container') as HTMLElement;
+    const table = node.querySelector('table') as HTMLElement;
+
+    // Expand to fit full scrollable width of the table during capture
+    const fullWidth = table ? Math.max(node.clientWidth, table.scrollWidth + 40) : node.clientWidth;
+
+    const originalOverflowX = tableContainer ? tableContainer.style.overflowX : '';
+    const originalWidth = tableContainer ? tableContainer.style.width : '';
+
+    if (tableContainer) {
+      tableContainer.style.overflowX = 'visible';
+      tableContainer.style.width = 'auto';
+    }
+
     toPng(node, {
       cacheBust: true,
       backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
+        width: `${fullWidth}px`,
       },
       filter: (domNode: any) => {
         // Filter out action buttons during capture
@@ -66,6 +81,12 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
       })
       .catch((error) => {
         console.error('Pairings PNG export failed', error);
+      })
+      .finally(() => {
+        if (tableContainer) {
+          tableContainer.style.overflowX = originalOverflowX;
+          tableContainer.style.width = originalWidth;
+        }
       });
   };
 

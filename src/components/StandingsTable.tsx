@@ -162,11 +162,26 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     const node = document.getElementById('standings-card');
     if (!node) return;
 
+    const tableContainer = node.querySelector('.table-container') as HTMLElement;
+    const table = node.querySelector('table') as HTMLElement;
+    
+    // Expand to fit full scrollable width of the table during capture
+    const fullWidth = table ? Math.max(node.clientWidth, table.scrollWidth + 40) : node.clientWidth;
+
+    const originalOverflowX = tableContainer ? tableContainer.style.overflowX : '';
+    const originalWidth = tableContainer ? tableContainer.style.width : '';
+    
+    if (tableContainer) {
+      tableContainer.style.overflowX = 'visible';
+      tableContainer.style.width = 'auto';
+    }
+
     toPng(node, {
       cacheBust: true,
       backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
+        width: `${fullWidth}px`,
       },
       filter: (domNode: any) => {
         if (domNode.classList && (
@@ -186,6 +201,12 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
       })
       .catch((error) => {
         console.error('Standings PNG export failed', error);
+      })
+      .finally(() => {
+        if (tableContainer) {
+          tableContainer.style.overflowX = originalOverflowX;
+          tableContainer.style.width = originalWidth;
+        }
       });
   };
 
@@ -217,7 +238,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
               {/* Round-by-round result columns */}
               {completedOrActiveRounds.map((round) => (
                 <th key={round.roundNumber} style={{ textAlign: 'center' }} title={`${round.roundNumber} 라운드 결과`}>
-                  Round #{round.roundNumber}
+                  R{round.roundNumber}
                 </th>
               ))}
               {/* Tiebreak columns */}

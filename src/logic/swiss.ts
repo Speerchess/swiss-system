@@ -9,42 +9,64 @@ export function havePlayed(p1: Player, p2Id: string): boolean {
 export function getColorStats(player: Player) {
   let whiteCount = 0;
   let blackCount = 0;
+
+  // Count total W and B in history
+  for (const col of player.colors) {
+    if (col === 'W') whiteCount++;
+    if (col === 'B') blackCount++;
+  }
+
+  // Count consecutive same colors at the end of history
   let consecutiveSame = 0;
   let lastColor: 'W' | 'B' | null = null;
 
   for (let i = player.colors.length - 1; i >= 0; i--) {
     const col = player.colors[i];
-    if (col === 'W') {
-      whiteCount++;
-      if (lastColor === null) {
-        lastColor = 'W';
-        consecutiveSame = 1;
-      } else if (lastColor === 'W') {
-        consecutiveSame++;
-      } else {
-        lastColor = 'W'; // stop counting consecutive once color changes
-      }
-    } else if (col === 'B') {
-      blackCount++;
-      if (lastColor === null) {
-        lastColor = 'B';
-        consecutiveSame = 1;
-      } else if (lastColor === 'B') {
-        consecutiveSame++;
-      } else {
-        lastColor = 'B'; // stop counting consecutive
-      }
+    if (col === 'BYE') continue; // Skip byes in color history
+
+    if (lastColor === null) {
+      lastColor = col as 'W' | 'B';
+      consecutiveSame = 1;
+    } else if (lastColor === col) {
+      consecutiveSame++;
+    } else {
+      break; // Color changed, stop counting consecutive
     }
   }
 
-  const currentDiff = whiteCount - blackCount;
   return {
     whiteCount,
     blackCount,
-    currentDiff,
+    currentDiff: whiteCount - blackCount,
     consecutiveSame,
     lastColor,
   };
+}
+
+// Check if color assignment is legal under standard Swiss rules
+// Rule 1: No player can play the same color 3 times in a row
+// Rule 2: Color difference limit (|W - B| <= 2)
+export function isColorAssignmentLegal(
+  player: Player,
+  assignedColor: 'W' | 'B',
+  level: 1 | 2 | 3 // level of strictness
+): boolean {
+  const stats = getColorStats(player);
+
+  // Level 1: Strict color difference (<= 2) and strict consecutive (< 3)
+  if (level === 1) {
+    const newDiff = stats.currentDiff + (assignedColor === 'W' ? 1 : -1);
+    if (Math.abs(newDiff) > 2) return false;
+    if (stats.consecutiveSame >= 2 && stats.lastColor === assignedColor) return false;
+  }
+  
+  // Level 2: Relax color difference, but strictly forbid 3 consecutive same color
+  if (level === 2) {
+    if (stats.consecutiveSame >= 2 && stats.lastColor === assignedColor) return false;
+  }
+
+  // Level 3: Relax everything
+  return true;
 }
 
 // Determine who gets White (player1) and who gets Black (player2)
@@ -53,10 +75,7 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
   const stats1 = getColorStats(p1);
   const stats2 = getColorStats(p2);
 
-  // 1. If one player has a stronger preference due to color difference
-  // We want to balance towards 0. So if p1 has +1 (more White) and p2 has 0, p2 should play White.
-  // Preference is to play the color that reduces the absolute difference.
-  // Preferred color for p1: diff > 0 -> B, diff < 0 -> W, diff == 0 -> neutral
+  // Preference is to play the color that reduces the absolute color difference
   const pref1 = stats1.currentDiff > 0 ? 'B' : stats1.currentDiff < 0 ? 'W' : null;
   const pref2 = stats2.currentDiff > 0 ? 'B' : stats2.currentDiff < 0 ? 'W' : null;
 
@@ -66,15 +85,10 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
   if (!pref1 && pref2) {
     return pref2 === 'W' ? [p2.id, p1.id] : [p1.id, p2.id];
   }
-
-  // If both have opposing preferences (e.g. p1 wants B, p2 wants W)
   if (pref1 && pref2 && pref1 !== pref2) {
     return pref1 === 'W' ? [p1.id, p2.id] : [p2.id, p1.id];
   }
-
-  // If both have the same preference (e.g. both want White)
   if (pref1 && pref2 && pref1 === pref2) {
-    // Give it to the one with the larger absolute difference
     if (Math.abs(stats1.currentDiff) > Math.abs(stats2.currentDiff)) {
       return pref1 === 'W' ? [p1.id, p2.id] : [p2.id, p1.id];
     } else if (Math.abs(stats1.currentDiff) < Math.abs(stats2.currentDiff)) {
@@ -82,20 +96,12 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
     }
   }
 
-  // 2. If preferences are equal or neutral, check consecutive games
+  // If neutral, check last color
   if (stats1.lastColor && stats2.lastColor && stats1.lastColor !== stats2.lastColor) {
-    // If p1 played W last, they want B. If p2 played B last, they want W.
-    // This is a perfect match!
-    if (stats1.lastColor === 'W') {
-      return [p2.id, p1.id]; // p2 gets White, p1 gets Black
-    } else {
-      return [p1.id, p2.id]; // p1 gets White, p2 gets Black
-    }
+    return stats1.lastColor === 'W' ? [p2.id, p1.id] : [p1.id, p2.id];
   }
 
-  // If both played the same color last
   if (stats1.lastColor && stats1.lastColor === stats2.lastColor) {
-    // Give the preferred opposite color to the one who has played it consecutively more times
     if (stats1.consecutiveSame > stats2.consecutiveSame) {
       return stats1.lastColor === 'W' ? [p2.id, p1.id] : [p1.id, p2.id];
     } else if (stats1.consecutiveSame < stats2.consecutiveSame) {
@@ -103,8 +109,7 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
     }
   }
 
-  // 3. Fallback: Seed rating/rank or ID comparison to be deterministic
-  // If ratings are available, higher rating gets White in odd rounds, Black in even rounds
+  // Fallback: Rating or deterministic ID comparison
   const roundNum = p1.colors.length + 1;
   const rating1 = p1.rating ?? 0;
   const rating2 = p2.rating ?? 0;
@@ -118,43 +123,16 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
     }
   }
 
-  // Ultimate fallback: Lexicographical order of IDs
   return p1.id < p2.id ? [p1.id, p2.id] : [p2.id, p1.id];
 }
 
-// Check if color assignment is legal under standard Swiss rules (no same color 3 times, diff <= 2)
-// Returns false if it violates rules and we want to enforce strictly.
-export function isColorAssignmentLegal(
-  player: Player,
-  assignedColor: 'W' | 'B',
-  strict: boolean = true
-): boolean {
-  if (!strict) return true;
-
-  const stats = getColorStats(player);
-
-  // Rule 1: No player can have a color difference absolute value > 2
-  const newDiff = stats.currentDiff + (assignedColor === 'W' ? 1 : -1);
-  if (Math.abs(newDiff) > 2) {
-    return false;
-  }
-
-  // Rule 2: No player can play the same color 3 times in a row
-  if (stats.consecutiveSame >= 2 && stats.lastColor === assignedColor) {
-    return false;
-  }
-
-  return true;
-}
-
-// Backtracking solver to find a pairing for the list of players
-// Returns list of player pairs (each pair is [p1, p2]) or null if no valid pairing
+// Backtracking solver using candidate priorities to match score groups and split halves
 function solvePairings(
   players: Player[],
   index: number,
   paired: Set<string>,
   pairs: [Player, Player][],
-  strictColors: boolean,
+  colorConstraintLevel: 1 | 2 | 3,
   avoidReplays: boolean
 ): [Player, Player][] | null {
   if (index >= players.length) {
@@ -163,15 +141,54 @@ function solvePairings(
 
   const p1 = players[index];
   if (paired.has(p1.id)) {
-    return solvePairings(players, index + 1, paired, pairs, strictColors, avoidReplays);
+    return solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
   }
 
-  // Try to pair p1 with some p2
-  for (let i = index + 1; i < players.length; i++) {
-    const p2 = players[i];
-    if (paired.has(p2.id)) continue;
+  // Get all active, unpaired candidates
+  const candidates = players.filter((p) => p.id !== p1.id && !paired.has(p.id));
 
-    // Check if they've played each other
+  // Sort candidates by preference:
+  // 1. Same score group, counterpart (split-half counterpart)
+  // 2. Same score group, others
+  // 3. Floaters (score difference * 10 penalty)
+  const getCandidatePriority = (p2: Player) => {
+    const scoreDiff = Math.abs(p1.score - p2.score);
+    
+    // Check split-half counterpart inside the same score group
+    const sameScoreGroup = players.filter((p) => p.score === p1.score && !paired.has(p.id));
+    const p1Idx = sameScoreGroup.findIndex((p) => p.id === p1.id);
+    const p2Idx = sameScoreGroup.findIndex((p) => p.id === p2.id);
+    
+    let isCounterpart = false;
+    if (p1Idx !== -1 && p2Idx !== -1) {
+      const half = Math.floor(sameScoreGroup.length / 2);
+      if (p1Idx < half && p2Idx === p1Idx + half) {
+        isCounterpart = true;
+      } else if (p1Idx >= half && p2Idx === p1Idx - half) {
+        isCounterpart = true;
+      }
+    }
+
+    let priority = scoreDiff * 10;
+    if (scoreDiff === 0) {
+      priority = isCounterpart ? -100 : 0;
+    }
+    return priority;
+  };
+
+  const sortedCandidates = [...candidates].sort((a, b) => {
+    const prioA = getCandidatePriority(a);
+    const prioB = getCandidatePriority(b);
+    if (prioA !== prioB) return prioA - prioB;
+    
+    // Tiebreaker: Rating descending
+    const rA = a.rating ?? 0;
+    const rB = b.rating ?? 0;
+    return rB - rA;
+  });
+
+  for (const p2 of sortedCandidates) {
+    // Rule 0: No replays
     if (avoidReplays && havePlayed(p1, p2.id)) {
       continue;
     }
@@ -182,18 +199,18 @@ function solvePairings(
     const p2Color = whiteId === p2.id ? 'W' : 'B';
 
     if (
-      strictColors &&
-      (!isColorAssignmentLegal(p1, p1Color, true) || !isColorAssignmentLegal(p2, p2Color, true))
+      !isColorAssignmentLegal(p1, p1Color, colorConstraintLevel) ||
+      !isColorAssignmentLegal(p2, p2Color, colorConstraintLevel)
     ) {
       continue;
     }
 
-    // Choose this pairing and recurse
+    // Choose pairing
     paired.add(p1.id);
     paired.add(p2.id);
     pairs.push([p1, p2]);
 
-    const result = solvePairings(players, index + 1, paired, pairs, strictColors, avoidReplays);
+    const result = solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
     if (result !== null) {
       return result;
     }
@@ -217,7 +234,7 @@ export function generateSwissPairings(
   // Sort active players: 
   // 1. By current Score descending
   // 2. By Rating descending
-  // 3. By Name (or ID) to ensure determinism
+  // 3. By Name to ensure determinism
   const sortedPlayers = [...activePlayers].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     const ratingA = a.rating ?? 0;
@@ -233,7 +250,6 @@ export function generateSwissPairings(
   // 1. Handle BYE if player count is odd
   if (playersToPair.length % 2 !== 0) {
     // Find the player with the lowest score who has NOT received a bye yet
-    // Since playersToPair is sorted by score desc, we search from the bottom (end of array)
     let byePlayerIdx = -1;
     for (let i = playersToPair.length - 1; i >= 0; i--) {
       if (!playersToPair[i].byeReceived) {
@@ -242,7 +258,7 @@ export function generateSwissPairings(
       }
     }
 
-    // Fallback if everyone already had a bye (rare, but possible in long tournaments)
+    // Fallback if everyone already had a bye
     if (byePlayerIdx === -1) {
       byePlayerIdx = playersToPair.length - 1;
     }
@@ -260,28 +276,59 @@ export function generateSwissPairings(
     };
   }
 
-  // 2. Try to find pairings
-  // We try combinations:
-  // Level 1: Strict colors, Avoid replays
-  // Level 2: Relaxed colors, Avoid replays
-  // Level 3: Relaxed colors, Allow replays (absolute emergency fallback)
+  // 2. Pair matches
   let solvedPairs: [Player, Player][] | null = null;
 
-  solvedPairs = solvePairings(playersToPair, 0, new Set(), [], true, true);
+  if (roundNumber === 1) {
+    // ROUND 1: Direct split half pairing
+    // 1st vs (N/2 + 1)th, 2nd vs (N/2 + 2)th...
+    const N = playersToPair.length;
+    const half = N / 2;
+    solvedPairs = [];
+    for (let i = 0; i < half; i++) {
+      solvedPairs.push([playersToPair[i], playersToPair[i + half]]);
+    }
+  } else {
+    // ROUND 2+: Backtracking pairings solver
+    // Level 1: Strict color difference & Strict consecutive limit (max 2 consecutive same color)
+    solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 1, true);
 
-  if (solvedPairs === null) {
-    // Level 2: Relax colors
-    solvedPairs = solvePairings(playersToPair, 0, new Set(), [], false, true);
+    if (solvedPairs === null) {
+      // Level 2: Relax color difference, but strictly forbid same color 3 times
+      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 2, true);
+    }
+
+    if (solvedPairs === null) {
+      // Level 3: Relax all color constraints to avoid replays
+      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 3, true);
+    }
+
+    if (solvedPairs === null) {
+      // Level 4: Relax replays (absolute emergency fallback)
+      solvedPairs = solvePairings(playersToPair, 0, new Set(), [], 3, false);
+    }
   }
 
-  if (solvedPairs === null) {
-    // Level 3: Relax replays (should practically never happen unless number of players is very small and round number is high)
-    solvedPairs = solvePairings(playersToPair, 0, new Set(), [], false, false);
-  }
-
+  // 3. Generate matches with correct colors
   if (solvedPairs !== null) {
     solvedPairs.forEach(([p1, p2], idx) => {
-      const [whiteId, blackId] = determineColors(p1, p2);
+      let whiteId: string;
+      let blackId: string;
+
+      if (roundNumber === 1) {
+        // Round 1 colors rule: alternating colors for top half: White, Black, White, Black...
+        // idx 0 -> White/Black, idx 1 -> Black/White, idx 2 -> White/Black...
+        if (idx % 2 === 0) {
+          whiteId = p1.id;
+          blackId = p2.id;
+        } else {
+          whiteId = p2.id;
+          blackId = p1.id;
+        }
+      } else {
+        [whiteId, blackId] = determineColors(p1, p2);
+      }
+
       matches.push({
         id: `r${roundNumber}-m${idx + 1}`,
         round: roundNumber,
@@ -292,8 +339,7 @@ export function generateSwissPairings(
       });
     });
   } else {
-    // Worst case fallback: just pair adjacent players from the sorted list
-    // (This guarantees we produce matches even if backtracking fails completely)
+    // Worst case fallback pairing (adjacent)
     for (let i = 0; i < playersToPair.length; i += 2) {
       if (i + 1 < playersToPair.length) {
         const p1 = playersToPair[i];
@@ -311,7 +357,6 @@ export function generateSwissPairings(
     }
   }
 
-  // If there was a bye, add it to the matches list
   if (byeMatch) {
     matches.push(byeMatch);
   }

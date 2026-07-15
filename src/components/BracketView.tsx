@@ -122,11 +122,26 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
     const node = document.getElementById('bracket-card');
     if (!node) return;
 
+    const bracketOuter = node.querySelector('.bracket-outer') as HTMLElement;
+    const bracketContainer = node.querySelector('.bracket-container') as HTMLElement;
+
+    // Expand to fit full scrollable width of the bracket during capture
+    const fullWidth = bracketContainer ? Math.max(node.clientWidth, bracketContainer.scrollWidth + 40) : node.clientWidth;
+
+    const originalOverflow = bracketOuter ? bracketOuter.style.overflow : '';
+    const originalWidth = bracketOuter ? bracketOuter.style.width : '';
+
+    if (bracketOuter) {
+      bracketOuter.style.overflow = 'visible';
+      bracketOuter.style.width = 'auto';
+    }
+
     toPng(node, {
       cacheBust: true,
-      backgroundColor: '#060913',
+      backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
+        width: `${fullWidth}px`,
       },
       filter: (domNode: any) => {
         // Exclude specific action elements like buttons
@@ -147,6 +162,12 @@ export const BracketView: React.FC<BracketViewProps> = ({ rounds, players, type 
       })
       .catch((error) => {
         console.error('Bracket PNG export failed', error);
+      })
+      .finally(() => {
+        if (bracketOuter) {
+          bracketOuter.style.overflow = originalOverflow;
+          bracketOuter.style.width = originalWidth;
+        }
       });
   };
 
