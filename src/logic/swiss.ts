@@ -126,15 +126,17 @@ export function determineColors(p1: Player, p2: Player): [string, string] {
   return p1.id < p2.id ? [p1.id, p2.id] : [p2.id, p1.id];
 }
 
+type PairWithColors = { p1: Player; p2: Player; whiteId: string; blackId: string };
+
 // Backtracking solver using candidate priorities to match score groups and split halves
 function solvePairings(
   players: Player[],
   index: number,
   paired: Set<string>,
-  pairs: [Player, Player][],
+  pairs: PairWithColors[],
   colorConstraintLevel: 1 | 2 | 3,
   avoidReplays: boolean
-): [Player, Player][] | null {
+): PairWithColors[] | null {
   if (index >= players.length) {
     return [...pairs];
   }
@@ -193,32 +195,39 @@ function solvePairings(
       continue;
     }
 
-    // Determine colors and check legality
-    const [whiteId] = determineColors(p1, p2);
-    const p1Color = whiteId === p1.id ? 'W' : 'B';
-    const p2Color = whiteId === p2.id ? 'W' : 'B';
+    // Try both color assignments: preferred first, then swapped
+    const [preferredWhiteId, preferredBlackId] = determineColors(p1, p2);
+    const colorOptions: [string, string][] = [
+      [preferredWhiteId, preferredBlackId],
+      [preferredBlackId, preferredWhiteId], // swapped
+    ];
 
-    if (
-      !isColorAssignmentLegal(p1, p1Color, colorConstraintLevel) ||
-      !isColorAssignmentLegal(p2, p2Color, colorConstraintLevel)
-    ) {
-      continue;
+    for (const [whiteId, blackId] of colorOptions) {
+      const p1Color: 'W' | 'B' = whiteId === p1.id ? 'W' : 'B';
+      const p2Color: 'W' | 'B' = whiteId === p2.id ? 'W' : 'B';
+
+      if (
+        !isColorAssignmentLegal(p1, p1Color, colorConstraintLevel) ||
+        !isColorAssignmentLegal(p2, p2Color, colorConstraintLevel)
+      ) {
+        continue; // Try the other color assignment
+      }
+
+      // Choose pairing
+      paired.add(p1.id);
+      paired.add(p2.id);
+      pairs.push({ p1, p2, whiteId, blackId });
+
+      const result = solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
+      if (result !== null) {
+        return result;
+      }
+
+      // Backtrack
+      paired.delete(p1.id);
+      paired.delete(p2.id);
+      pairs.pop();
     }
-
-    // Choose pairing
-    paired.add(p1.id);
-    paired.add(p2.id);
-    pairs.push([p1, p2]);
-
-    const result = solvePairings(players, index + 1, paired, pairs, colorConstraintLevel, avoidReplays);
-    if (result !== null) {
-      return result;
-    }
-
-    // Backtrack
-    paired.delete(p1.id);
-    paired.delete(p2.id);
-    pairs.pop();
   }
 
   return null;
@@ -277,7 +286,7 @@ export function generateSwissPairings(
   }
 
   // 2. Pair matches
-  let solvedPairs: [Player, Player][] | null = null;
+  let solvedPairs: PairWithColors[] | null = null;
 
   if (roundNumber === 1) {
     // ROUND 1: Direct split half pairing
@@ -286,7 +295,14 @@ export function generateSwissPairings(
     const half = N / 2;
     solvedPairs = [];
     for (let i = 0; i < half; i++) {
-      solvedPairs.push([playersToPair[i], playersToPair[i + half]]);
+      const p1 = playersToPair[i];
+      const p2 = playersToPair[i + half];
+      // Round 1 colors rule: alternating colors for top half
+      if (i % 2 === 0) {
+        solvedPairs.push({ p1, p2, whiteId: p1.id, blackId: p2.id });
+      } else {
+        solvedPairs.push({ p1, p2, whiteId: p2.id, blackId: p1.id });
+      }
     }
   } else {
     // ROUND 2+: Backtracking pairings solver
@@ -309,31 +325,14 @@ export function generateSwissPairings(
     }
   }
 
-  // 3. Generate matches with correct colors
+  // 3. Generate matches using the resolved color assignments from the solver
   if (solvedPairs !== null) {
-    solvedPairs.forEach(([p1, p2], idx) => {
-      let whiteId: string;
-      let blackId: string;
-
-      if (roundNumber === 1) {
-        // Round 1 colors rule: alternating colors for top half: White, Black, White, Black...
-        // idx 0 -> White/Black, idx 1 -> Black/White, idx 2 -> White/Black...
-        if (idx % 2 === 0) {
-          whiteId = p1.id;
-          blackId = p2.id;
-        } else {
-          whiteId = p2.id;
-          blackId = p1.id;
-        }
-      } else {
-        [whiteId, blackId] = determineColors(p1, p2);
-      }
-
+    solvedPairs.forEach((pair, idx) => {
       matches.push({
         id: `r${roundNumber}-m${idx + 1}`,
         round: roundNumber,
-        player1Id: whiteId,
-        player2Id: blackId,
+        player1Id: pair.whiteId,
+        player2Id: pair.blackId,
         result: null,
         status: 'pending',
       });
