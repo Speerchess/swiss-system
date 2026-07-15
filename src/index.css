@@ -273,6 +273,12 @@ textarea {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 1.5rem;
+  width: 100%;
+}
+
+.dashboard-grid > div {
+  min-width: 0;
+  width: 100%;
 }
 
 @media (max-width: 1024px) {
@@ -298,6 +304,9 @@ textarea {
   border-radius: var(--border-radius-md);
   border: 1px solid var(--border-light);
   background: #ffffff;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 table {
@@ -884,41 +893,66 @@ html, body {
   }
 
   .glass-card {
-    padding: 1rem;
+    padding: 0.85rem;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   
   .tabs {
     gap: 0.2rem;
     margin-bottom: 1rem;
+    max-width: 100%;
   }
   
   .tab-btn {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.72rem;
   }
   
-  /* Compact Table styling on Mobile */
+  /* Compact Table styling on Mobile to fit 5 rounds */
   th, td {
-    padding: 0.5rem 0.4rem !important;
-    font-size: 0.75rem !important;
+    padding: 0.35rem 0.2rem !important;
+    font-size: 0.72rem !important;
+    text-align: center;
   }
 
   .pairings-table th, .pairings-table td {
-    padding: 0.5rem 0.3rem !important;
+    padding: 0.4rem 0.2rem !important;
   }
 
-  /* Make name columns wrap or stay clean */
-  .pairings-table td:nth-child(2),
-  .pairings-table td:nth-child(6) {
-    max-width: 90px;
+  /* Make name columns wrap or stay clean with ellipsis */
+  table td:nth-child(2) {
+    max-width: 75px !important;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left !important;
+    padding-left: 0.4rem !important;
+  }
+
+  .pairings-table td:nth-child(2) {
+    text-align: right !important;
+    padding-right: 0.4rem !important;
+  }
+  
+  .pairings-table td:nth-child(6) {
+    text-align: left !important;
+    padding-left: 0.4rem !important;
+  }
+
+  /* Make round result chips super tight */
+  .round-result-win, .round-result-draw, .round-result-loss, .round-result-bye {
+    padding: 0.1rem 0.2rem !important;
+    font-size: 0.65rem !important;
+    white-space: nowrap;
+    display: inline-block;
   }
 
   .btn-result {
-    padding: 0.25rem 0.4rem !important;
-    font-size: 0.7rem !important;
+    padding: 0.25rem 0.35rem !important;
+    font-size: 0.68rem !important;
   }
 
   .result-buttons {
