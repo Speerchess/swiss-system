@@ -157,40 +157,45 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
   // Get completed rounds (only show round columns for rounds that exist)
   const completedOrActiveRounds = rounds.filter(r => r.matches.length > 0);
 
-  // Export current standings card to PNG
+  // Export current standings card to PNG using off-screen cloning
   const handleDownloadPNG = () => {
-    const node = document.getElementById('standings-card');
-    if (!node) return;
+    const originalNode = document.getElementById('standings-card');
+    if (!originalNode) return;
 
-    const tableContainer = node.querySelector('.table-container') as HTMLElement;
-    const table = node.querySelector('table') as HTMLElement;
+    // Clone the node
+    const clone = originalNode.cloneNode(true) as HTMLElement;
     
-    // Expand to fit full scrollable width of the table during capture
-    const fullWidth = table ? Math.max(node.clientWidth, table.scrollWidth + 40) : node.clientWidth;
+    // Remove buttons from the clone to keep image clean
+    const elementsToRemove = clone.querySelectorAll('.btn-download-png, .btn');
+    elementsToRemove.forEach(el => el.remove());
 
-    const originalOverflowX = tableContainer ? tableContainer.style.overflowX : '';
-    const originalWidth = tableContainer ? tableContainer.style.width : '';
+    const table = clone.querySelector('table') as HTMLElement;
+    const tableContainer = clone.querySelector('.table-container') as HTMLElement;
+    
+    // Get actual table width or original card width
+    const scrollWidth = table ? table.scrollWidth : originalNode.scrollWidth;
+    const fullWidth = Math.max(originalNode.clientWidth, scrollWidth + 48); // Pad it slightly
+
+    // Position the cloned element off-screen
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '-9999px';
+    clone.style.width = `${fullWidth}px`;
+    clone.style.maxWidth = 'none';
     
     if (tableContainer) {
       tableContainer.style.overflowX = 'visible';
-      tableContainer.style.width = 'auto';
+      tableContainer.style.width = '100%';
+      tableContainer.style.maxWidth = 'none';
     }
 
-    toPng(node, {
+    document.body.appendChild(clone);
+
+    toPng(clone, {
       cacheBust: true,
       backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
-        width: `${fullWidth}px`,
-      },
-      filter: (domNode: any) => {
-        if (domNode.classList && (
-          domNode.classList.contains('btn-download-png') ||
-          domNode.classList.contains('btn')
-        )) {
-          return false;
-        }
-        return true;
       }
     })
       .then((dataUrl) => {
@@ -203,10 +208,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
         console.error('Standings PNG export failed', error);
       })
       .finally(() => {
-        if (tableContainer) {
-          tableContainer.style.overflowX = originalOverflowX;
-          tableContainer.style.width = originalWidth;
-        }
+        document.body.removeChild(clone);
       });
   };
 

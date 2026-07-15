@@ -34,43 +34,45 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
 
   const isRoundPending = matches.some((m) => m.status === 'pending');
 
-  // Export pairings card to PNG
+  // Export pairings card to PNG using off-screen cloning
   const handleDownloadPNG = () => {
-    const node = document.getElementById('pairings-card');
-    if (!node) return;
+    const originalNode = document.getElementById('pairings-card');
+    if (!originalNode) return;
 
-    const tableContainer = node.querySelector('.pairings-table-container') as HTMLElement;
-    const table = node.querySelector('table') as HTMLElement;
+    // Clone the node
+    const clone = originalNode.cloneNode(true) as HTMLElement;
+    
+    // Remove action buttons from clone
+    const elementsToRemove = clone.querySelectorAll('.btn-download-png, .result-buttons, .set-result-btn, button');
+    elementsToRemove.forEach(el => el.remove());
 
-    // Expand to fit full scrollable width of the table during capture
-    const fullWidth = table ? Math.max(node.clientWidth, table.scrollWidth + 40) : node.clientWidth;
+    const table = clone.querySelector('table') as HTMLElement;
+    const tableContainer = clone.querySelector('.pairings-table-container') as HTMLElement;
 
-    const originalOverflowX = tableContainer ? tableContainer.style.overflowX : '';
-    const originalWidth = tableContainer ? tableContainer.style.width : '';
+    // Get actual table width
+    const scrollWidth = table ? table.scrollWidth : originalNode.scrollWidth;
+    const fullWidth = Math.max(originalNode.clientWidth, scrollWidth + 48);
+
+    // Style the clone off-screen
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '-9999px';
+    clone.style.width = `${fullWidth}px`;
+    clone.style.maxWidth = 'none';
 
     if (tableContainer) {
       tableContainer.style.overflowX = 'visible';
-      tableContainer.style.width = 'auto';
+      tableContainer.style.width = '100%';
+      tableContainer.style.maxWidth = 'none';
     }
 
-    toPng(node, {
+    document.body.appendChild(clone);
+
+    toPng(clone, {
       cacheBust: true,
       backgroundColor: '#ffffff',
       style: {
         borderRadius: '0px',
-        width: `${fullWidth}px`,
-      },
-      filter: (domNode: any) => {
-        // Filter out action buttons during capture
-        if (domNode.classList && (
-          domNode.classList.contains('btn-download-png') || 
-          domNode.classList.contains('result-buttons') ||
-          domNode.classList.contains('set-result-btn') ||
-          domNode.tagName === 'BUTTON'
-        )) {
-          return false;
-        }
-        return true;
       }
     })
       .then((dataUrl) => {
@@ -83,10 +85,7 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
         console.error('Pairings PNG export failed', error);
       })
       .finally(() => {
-        if (tableContainer) {
-          tableContainer.style.overflowX = originalOverflowX;
-          tableContainer.style.width = originalWidth;
-        }
+        document.body.removeChild(clone);
       });
   };
 
