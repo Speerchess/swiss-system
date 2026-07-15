@@ -340,9 +340,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                   )}
                   {/* Tiebreak value cells */}
                   {tiebreakOrder.map((criteria) => {
-                    if (criteria === 'direct-encounter') {
-                      return <td key={criteria} style={{ textAlign: 'center' }}>-</td>;
-                    }
                     const val = getTiebreakValue(player, criteria);
                     return (
                       <td key={criteria} style={{ textAlign: 'center' }}>

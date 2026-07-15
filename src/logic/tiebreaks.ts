@@ -166,6 +166,34 @@ export function calculateTiebreaks(
     const runningScores = runningScoresMap.get(player.id) || [];
     const cumulativeScore = runningScores.reduce((sum, score) => sum + score, 0);
 
+    // Direct Encounter (Head-to-head score against players with the same score)
+    let dePoints = 0;
+    const tiedPlayerIds = Array.from(playerMap.values())
+      .filter((p) => p.id !== player.id && p.score === player.score)
+      .map((p) => p.id);
+
+    if (tiedPlayerIds.length > 0) {
+      for (const round of sortedRounds) {
+        for (const match of round.matches) {
+          if (match.status !== 'completed') continue;
+
+          if (match.player1Id === player.id && tiedPlayerIds.includes(match.player2Id || '')) {
+            if (match.result === '1-0') {
+              dePoints += 1.0;
+            } else if (match.result === '1/2-1/2') {
+              dePoints += 0.5;
+            }
+          } else if (match.player2Id === player.id && tiedPlayerIds.includes(match.player1Id)) {
+            if (match.result === '0-1') {
+              dePoints += 1.0;
+            } else if (match.result === '1/2-1/2') {
+              dePoints += 0.5;
+            }
+          }
+        }
+      }
+    }
+
     // Update tiebreaks object
     player.tiebreaks = {
       buchholz: buchholzSum,
@@ -173,7 +201,7 @@ export function calculateTiebreaks(
       buchholzCut1,
       sonnebornBerger: sbSum,
       cumulative: cumulativeScore,
-      directEncounter: 0, // Direct Encounter is checked dynamically in sorting
+      directEncounter: dePoints,
       rating: player.rating ?? 0,
     };
   });
