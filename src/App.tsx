@@ -102,7 +102,7 @@ export default function App() {
 
     // Generate initial round matches depending on type
     if (type === 'swiss') {
-      const firstRoundMatches = generateSwissPairings(initialPlayers, 1, settings.pointsPerBye);
+      const firstRoundMatches = generateSwissPairings(initialPlayers, 1, tiebreakOrder, [], settings.pointsPerBye);
       initialRounds = [{
         roundNumber: 1,
         matches: firstRoundMatches,
@@ -187,6 +187,8 @@ export default function App() {
     const nextRoundMatches = generateSwissPairings(
       state.players,
       nextRoundNumber,
+      state.tiebreakOrder,
+      state.rounds,
       state.settings.pointsPerBye
     );
 

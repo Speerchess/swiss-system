@@ -1,4 +1,5 @@
-import type { Player, Match } from './types';
+import type { Player, Match, TiebreakType, Round } from './types';
+import { comparePlayers } from './tiebreaks';
 
 // Helper to check if two players have played each other
 export function havePlayed(p1: Player, p2Id: string): boolean {
@@ -254,21 +255,17 @@ function solvePairings(
 export function generateSwissPairings(
   players: Player[],
   roundNumber: number,
+  tiebreakOrder: TiebreakType[],
+  rounds: Round[],
   _pointsPerBye: number = 1
 ): Match[] {
   const activePlayers = players.filter((p) => p.active);
 
-  // Sort active players: 
-  // 1. By current Score descending
-  // 2. By Rating descending
-  // 3. By Name to ensure determinism
-  const sortedPlayers = [...activePlayers].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const ratingA = a.rating ?? 0;
-    const ratingB = b.rating ?? 0;
-    if (ratingB !== ratingA) return ratingB - ratingA;
-    return a.name.localeCompare(b.name);
-  });
+  // Sort active players precisely using the standings rankings comparator (including tiebreaks)
+  // to ensure that the bye player selection is based on the absolute lowest standing.
+  const sortedPlayers = [...activePlayers].sort((a, b) =>
+    comparePlayers(a, b, tiebreakOrder, rounds)
+  );
 
   const matches: Match[] = [];
   let byeMatch: Match | null = null;
