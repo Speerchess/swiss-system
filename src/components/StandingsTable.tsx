@@ -32,6 +32,27 @@ const TIEBREAK_TOOLTIPS: Record<TiebreakType, string> = {
   'rating': 'Rating (본인 레이팅)',
 };
 
+const getTiebreakValue = (player: Player, criteria: TiebreakType): number | undefined => {
+  switch (criteria) {
+    case 'buchholz':
+      return player.tiebreaks.buchholz;
+    case 'median-buchholz':
+      return player.tiebreaks.medianBuchholz;
+    case 'buchholz-cut1':
+      return player.tiebreaks.buchholzCut1;
+    case 'sonneborn-berger':
+      return player.tiebreaks.sonnebornBerger;
+    case 'cumulative':
+      return player.tiebreaks.cumulative;
+    case 'direct-encounter':
+      return player.tiebreaks.directEncounter;
+    case 'rating':
+      return player.tiebreaks.rating;
+    default:
+      return undefined;
+  }
+};
+
 /**
  * Build round-by-round result notation for a given player.
  * Format examples: +W3, =B2, -W1, +BYE
@@ -328,7 +349,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                     if (criteria === 'direct-encounter') {
                       return <td key={criteria} style={{ textAlign: 'center' }}>-</td>;
                     }
-                    const val = player.tiebreaks[criteria as keyof typeof player.tiebreaks];
+                    const val = getTiebreakValue(player, criteria);
                     return (
                       <td key={criteria} style={{ textAlign: 'center' }}>
                         {typeof val === 'number'
