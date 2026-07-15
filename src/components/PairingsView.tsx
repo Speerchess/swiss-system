@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Match, Player, MatchResult } from '../logic/types';
+import type { Match, Player, MatchResult, TournamentType } from '../logic/types';
 import { AlertCircle, Camera, X } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
@@ -10,6 +10,7 @@ interface PairingsViewProps {
   onEnterResult: (matchId: string, result: MatchResult) => void;
   isCurrentRound: boolean;
   tournamentCompleted: boolean;
+  tournamentType?: TournamentType;
 }
 
 export const PairingsView: React.FC<PairingsViewProps> = ({
@@ -19,7 +20,9 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
   onEnterResult,
   isCurrentRound,
   tournamentCompleted,
+  tournamentType,
 }) => {
+  const isElimination = tournamentType === 'single' || tournamentType === 'double' || tournamentType === 'triple';
   // Track which match is currently opening its result selector
   const [activeEditingMatchId, setActiveEditingMatchId] = useState<string | null>(null);
 
@@ -216,13 +219,15 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                                 >
                                   1-0
                                 </button>
-                                <button
-                                  className="btn-result"
-                                  onClick={() => handleResultClick(match.id, '1/2-1/2')}
-                                  title="무승부 (½-½)"
-                                >
-                                  ½-½
-                                </button>
+                                {!isElimination && (
+                                  <button
+                                    className="btn-result"
+                                    onClick={() => handleResultClick(match.id, '1/2-1/2')}
+                                    title="무승부 (½-½)"
+                                  >
+                                    ½-½
+                                  </button>
+                                )}
                                 <button
                                   className="btn-result"
                                   onClick={() => handleResultClick(match.id, '0-1')}

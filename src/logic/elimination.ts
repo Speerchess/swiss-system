@@ -173,23 +173,32 @@ export function propagateEliminationResults(
           changesMade = true;
         }
 
-        // Auto-resolve matches with byes
+        // Auto-resolve matches with byes - but ONLY when both sources are fully resolved.
+        // Without this check, 'player2Id === null' (default) is mistaken for a bye
+        // when the source match simply hasn't been played yet, causing cascading auto-completions.
         if (m.status === 'pending') {
-          const p1IsEmpty = !m.player1Id;
-          const p2IsEmpty = m.player2Id === null;
+          const mSources = m as MatchWithSources;
+          const p1SourceReady = !mSources.p1Source || getPlayerFromSource(mSources.p1Source).isReady;
+          const p2SourceReady = !mSources.p2Source || getPlayerFromSource(mSources.p2Source).isReady;
 
-          if (p1IsEmpty && p2IsEmpty) {
-            // Both empty: nothing to play yet
-          } else if (p1IsEmpty && !p2IsEmpty) {
-            // Player 1 is empty, Player 2 is real -> Player 2 wins by bye
-            m.result = '0-1';
-            m.status = 'completed';
-            changesMade = true;
-          } else if (!p1IsEmpty && p2IsEmpty) {
-            // Player 1 is real, Player 2 is empty (bye) -> Player 1 wins by bye
-            m.result = '1-0';
-            m.status = 'completed';
-            changesMade = true;
+          // Only auto-resolve if both sides have been determined
+          if (p1SourceReady && p2SourceReady) {
+            const p1IsEmpty = !m.player1Id;
+            const p2IsEmpty = m.player2Id === null;
+
+            if (p1IsEmpty && p2IsEmpty) {
+              // Both empty: double bye, skip
+            } else if (p1IsEmpty && !p2IsEmpty) {
+              // Player 1 is empty (bye), Player 2 is real -> Player 2 wins by bye
+              m.result = '0-1';
+              m.status = 'completed';
+              changesMade = true;
+            } else if (!p1IsEmpty && p2IsEmpty) {
+              // Player 1 is real, Player 2 is empty (bye) -> Player 1 wins by bye
+              m.result = '1-0';
+              m.status = 'completed';
+              changesMade = true;
+            }
           }
         }
       }

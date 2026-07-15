@@ -475,6 +475,7 @@ export default function App() {
                         : true // Elimination and Round Robin allow editing all rounds
                     }
                     tournamentCompleted={state.status === 'completed'}
+                    tournamentType={state.type}
                   />
 
                   {/* Next Round controls */}
