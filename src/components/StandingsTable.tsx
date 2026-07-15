@@ -309,11 +309,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                   </td>
                   <td style={{ fontWeight: '600' }}>
                     {player.name}
-                    {player.rating !== undefined && (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                        ({player.rating})
-                      </span>
-                    )}
                     {!player.active && (
                       <span style={{ 
                         fontSize: '0.7rem', 

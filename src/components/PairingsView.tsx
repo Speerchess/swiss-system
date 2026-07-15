@@ -176,11 +176,6 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                     {/* White Player */}
                     <td style={{ textAlign: 'right', fontWeight: '600', paddingRight: '1.5rem' }}>
                       {p1.name}
-                      {p1.rating !== undefined && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem', fontWeight: 'normal' }}>
-                          ({p1.rating})
-                        </span>
-                      )}
                     </td>
 
                     {/* White Player Pts */}
@@ -267,11 +262,6 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                     {/* Black Player */}
                     <td style={{ textAlign: 'left', fontWeight: '600', paddingLeft: '1.5rem', color: isBye ? 'var(--text-muted)' : 'inherit' }}>
                       {p2.name}
-                      {!isBye && p2.rating !== undefined && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem', fontWeight: 'normal' }}>
-                          ({p2.rating})
-                        </span>
-                      )}
                     </td>
                   </tr>
                 );
