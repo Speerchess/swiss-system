@@ -154,7 +154,20 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                       ) : (
                         <>
                           {isCurrentRound && !tournamentCompleted ? (
-                            isEditing ? (
+                            match.status === 'completed' && match.result && !isEditing ? (
+                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+                                <span className="result-cell-completed">
+                                  {match.result === '1/2-1/2' ? '½ - ½' : match.result}
+                                </span>
+                                <button
+                                  className="set-result-btn"
+                                  onClick={() => setActiveEditingMatchId(match.id)}
+                                  style={{ fontSize: '0.75rem' }}
+                                >
+                                  수정
+                                </button>
+                              </div>
+                            ) : (
                               <div className="result-buttons" style={{ justifyContent: 'center', alignItems: 'center', gap: '0.25rem' }}>
                                 <button
                                   className="btn-result"
@@ -177,37 +190,17 @@ export const PairingsView: React.FC<PairingsViewProps> = ({
                                 >
                                   0-1
                                 </button>
-                                <button
-                                  className="btn-result"
-                                  style={{ padding: '0.35rem', display: 'flex', alignItems: 'center', background: '#fee2e2', borderColor: '#fca5a5' }}
-                                  onClick={() => setActiveEditingMatchId(null)}
-                                  title="취소"
-                                >
-                                  <X size={12} style={{ color: '#ef4444' }} />
-                                </button>
-                              </div>
-                            ) : (
-                              match.status === 'completed' && match.result ? (
-                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span className="result-cell-completed">
-                                    {match.result === '1/2-1/2' ? '½ - ½' : match.result}
-                                  </span>
+                                {isEditing && (
                                   <button
-                                    className="set-result-btn"
-                                    onClick={() => setActiveEditingMatchId(match.id)}
-                                    style={{ fontSize: '0.75rem' }}
+                                    className="btn-result"
+                                    style={{ padding: '0.35rem', display: 'flex', alignItems: 'center', background: '#fee2e2', borderColor: '#fca5a5' }}
+                                    onClick={() => setActiveEditingMatchId(null)}
+                                    title="취소"
                                   >
-                                    수정
+                                    <X size={12} style={{ color: '#ef4444' }} />
                                   </button>
-                                </div>
-                              ) : (
-                                <button
-                                  className="set-result-btn"
-                                  onClick={() => setActiveEditingMatchId(match.id)}
-                                >
-                                  set result
-                                </button>
-                              )
+                                )}
+                              </div>
                             )
                           ) : (
                             <span className="result-cell-completed">
