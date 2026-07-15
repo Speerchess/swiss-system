@@ -159,15 +159,14 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     comparePlayers(a, b, tiebreakOrder, rounds)
   );
 
-  // Compute position numbers (handle ties - same rank for equal scores)
+  // Compute position numbers (handle ties - same rank if completely equal on all criteria)
   const positions: string[] = [];
   sortedPlayers.forEach((player, idx) => {
     if (idx === 0) {
       positions.push('1');
     } else {
       const prev = sortedPlayers[idx - 1];
-      if (player.score === prev.score) {
-        // Check if tiebreaks are identical (simplified: just use same position text)
+      if (comparePlayers(prev, player, tiebreakOrder, rounds) === 0) {
         positions.push(positions[idx - 1]);
       } else {
         positions.push((idx + 1).toString());

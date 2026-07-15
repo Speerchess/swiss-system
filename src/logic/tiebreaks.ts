@@ -185,6 +185,27 @@ export function calculateTiebreaks(
   return Array.from(playerMap.values());
 }
 
+function getTiebreakValue(player: Player, criteria: TiebreakType): number {
+  switch (criteria) {
+    case 'buchholz':
+      return player.tiebreaks.buchholz;
+    case 'median-buchholz':
+      return player.tiebreaks.medianBuchholz;
+    case 'buchholz-cut1':
+      return player.tiebreaks.buchholzCut1;
+    case 'sonneborn-berger':
+      return player.tiebreaks.sonnebornBerger;
+    case 'cumulative':
+      return player.tiebreaks.cumulative;
+    case 'direct-encounter':
+      return player.tiebreaks.directEncounter;
+    case 'rating':
+      return player.tiebreaks.rating;
+    default:
+      return 0;
+  }
+}
+
 /**
  * Comparator to sort players based on tournament score and ordered tiebreak criteria.
  * Returns negative if 'a' should rank higher than 'b', positive if 'b' should rank higher.
@@ -225,8 +246,8 @@ export function comparePlayers(
       }
       if (h2hResult !== 0) return h2hResult;
     } else {
-      const valA = a.tiebreaks[criteria as keyof typeof a.tiebreaks] ?? 0;
-      const valB = b.tiebreaks[criteria as keyof typeof b.tiebreaks] ?? 0;
+      const valA = getTiebreakValue(a, criteria);
+      const valB = getTiebreakValue(b, criteria);
       if (valB !== valA) {
         return valB - valA; // higher tiebreak value is better
       }
