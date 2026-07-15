@@ -445,8 +445,8 @@ export default function App() {
           </div>
 
           {/* Dashboard Grid */}
-          <div className="dashboard-grid">
-            {/* Left side: Pairings / Bracket View */}
+          <div className={['single', 'double', 'triple'].includes(state.type) ? "" : "dashboard-grid"}>
+            {/* Left/Main side: Pairings / Bracket View */}
             <div>
               {activeTab === 'pairings' ? (
                 <div>
@@ -531,20 +531,22 @@ export default function App() {
               )}
             </div>
 
-            {/* Right side: Standings */}
-            <div>
-              <StandingsTable
-                players={state.players}
-                tiebreakOrder={state.tiebreakOrder}
-                rounds={state.rounds}
-                onTogglePlayerActive={
-                  state.status === 'active' && state.type === 'swiss'
-                    ? handleTogglePlayerActive
-                    : undefined
-                }
-                isCompleted={state.status === 'completed'}
-              />
-            </div>
+            {/* Right side: Standings (Only show for Swiss / Round Robin) */}
+            {!['single', 'double', 'triple'].includes(state.type) && (
+              <div>
+                <StandingsTable
+                  players={state.players}
+                  tiebreakOrder={state.tiebreakOrder}
+                  rounds={state.rounds}
+                  onTogglePlayerActive={
+                    state.status === 'active' && state.type === 'swiss'
+                      ? handleTogglePlayerActive
+                      : undefined
+                  }
+                  isCompleted={state.status === 'completed'}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
