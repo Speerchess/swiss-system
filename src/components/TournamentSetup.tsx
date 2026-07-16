@@ -210,9 +210,12 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
     );
   };
 
-  const unusedTiebreaks = (Object.keys(TIEBREAK_NAMES) as TiebreakType[]).filter(
-    (type) => !tiebreakOrder.includes(type)
-  );
+  const unusedTiebreaks = (Object.keys(TIEBREAK_NAMES) as TiebreakType[]).filter((type) => {
+    if (tournamentType === 'round-robin' && ['buchholz', 'median-buchholz', 'buchholz-cut1', 'buchholz-second'].includes(type)) {
+      return false;
+    }
+    return !tiebreakOrder.includes(type);
+  });
 
   return (
     <div className="dashboard-grid">
@@ -246,7 +249,10 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
           <div className="grid-options">
             <div 
               className={`option-card ${tournamentType === 'swiss' ? 'selected' : ''}`}
-              onClick={() => setTournamentType('swiss')}
+              onClick={() => {
+                setTournamentType('swiss');
+                setTiebreakOrder(['buchholz-cut1', 'buchholz', 'sonneborn-berger', 'black-wins']);
+              }}
             >
               <div className="option-card-title">스위스 (Swiss)</div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -282,7 +288,10 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => 
             </div>
             <div 
               className={`option-card ${tournamentType === 'round-robin' ? 'selected' : ''}`}
-              onClick={() => setTournamentType('round-robin')}
+              onClick={() => {
+                setTournamentType('round-robin');
+                setTiebreakOrder(['sonneborn-berger', 'direct-encounter', 'black-wins']);
+              }}
             >
               <div className="option-card-title">라운드 로빈</div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
