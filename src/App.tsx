@@ -91,9 +91,11 @@ export default function App() {
         buchholz: 0,
         medianBuchholz: 0,
         buchholzCut1: 0,
+        buchholzSecond: 0,
         sonnebornBerger: 0,
         cumulative: 0,
         directEncounter: 0,
+        blackWins: 0,
         rating: p.rating ?? 0,
       },
     }));

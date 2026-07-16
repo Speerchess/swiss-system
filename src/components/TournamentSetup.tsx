@@ -29,18 +29,19 @@ const TIEBREAK_NAMES: Record<TiebreakType, string> = {
   'buchholz': 'Buchholz (부흐홀츠 - 상대 점수 합)',
   'median-buchholz': 'Median Buchholz (미디언 부흐홀츠 - 최고/최저 제외 상대 점수 합)',
   'buchholz-cut1': 'Buchholz Cut 1 (부흐홀츠 컷 1 - 최저 제외 상대 점수 합)',
+  'buchholz-second': 'Buchholz 2nd (부흐홀츠 2nd - 상대방의 북홀츠 점수 합)',
   'sonneborn-berger': 'Sonneborn-Berger (손네보른-베르거 - 이긴 상대 점수 + 비긴 상대 점수 0.5배)',
   'cumulative': 'Cumulative (누적 점수 - 라운드별 점수의 합)',
   'direct-encounter': 'Direct Encounter (승자승 - 승자 우선)',
+  'black-wins': 'Black Wins (흑으로 이긴 판수 우선)',
   'rating': 'Rating (레이팅 - 본인 레이팅 우선)',
 };
 
 const DEFAULT_TIEBREAKS: TiebreakType[] = [
-  'direct-encounter',
-  'buchholz',
   'buchholz-cut1',
+  'buchholz',
   'sonneborn-berger',
-  'rating',
+  'black-wins',
 ];
 
 export const TournamentSetup: React.FC<TournamentSetupProps> = ({ onStart }) => {

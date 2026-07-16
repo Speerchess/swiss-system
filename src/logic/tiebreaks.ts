@@ -28,9 +28,11 @@ export function calculateTiebreaks(
           buchholz: 0,
           medianBuchholz: 0,
           buchholzCut1: 0,
+          buchholzSecond: 0,
           sonnebornBerger: 0,
           cumulative: 0,
           directEncounter: 0,
+          blackWins: 0,
           rating: p.rating ?? 0,
         },
       },
@@ -100,10 +102,11 @@ export function calculateTiebreaks(
     });
   }
 
-  // 3. Second pass: Calculate opponent-based tiebreaks (Buchholz, SB, etc.)
+  // 3. Second pass: Calculate opponent-based tiebreaks (Buchholz, SB, black wins)
   playerMap.forEach((player) => {
     let buchholzSum = 0;
     let sbSum = 0;
+    let blackWinsCount = 0;
     const opponentScores: number[] = [];
 
     // We need to look at matches this player played to calculate Sonneborn-Berger
@@ -117,7 +120,7 @@ export function calculateTiebreaks(
       opponentScores.push(oppScore);
     });
 
-    // Sonneborn-Berger
+    // Sonneborn-Berger & Black Wins
     // Walk through all completed matches to check results for this player
     for (const round of sortedRounds) {
       for (const match of round.matches) {
@@ -137,6 +140,7 @@ export function calculateTiebreaks(
           if (opponent) {
             if (match.result === '0-1') {
               sbSum += opponent.score;
+              blackWinsCount++; // Won playing as Black (player 2)
             } else if (match.result === '1/2-1/2') {
               sbSum += opponent.score * 0.5;
             }
@@ -194,16 +198,30 @@ export function calculateTiebreaks(
       }
     }
 
-    // Update tiebreaks object
+    // Update tiebreaks object (excluding buchholzSecond for now, which needs opponents' Buchholz populated)
     player.tiebreaks = {
       buchholz: buchholzSum,
       medianBuchholz,
       buchholzCut1,
+      buchholzSecond: 0,
       sonnebornBerger: sbSum,
       cumulative: cumulativeScore,
       directEncounter: dePoints,
+      blackWins: blackWinsCount,
       rating: player.rating ?? 0,
     };
+  });
+
+  // 4. Third pass: Calculate Buchholz 2nd (sum of opponents' Buchholz scores)
+  playerMap.forEach((player) => {
+    let buchholzSecondSum = 0;
+    player.opponents.forEach((oppId) => {
+      const opponent = playerMap.get(oppId);
+      if (opponent) {
+        buchholzSecondSum += opponent.tiebreaks.buchholz;
+      }
+    });
+    player.tiebreaks.buchholzSecond = buchholzSecondSum;
   });
 
   return Array.from(playerMap.values());
@@ -217,12 +235,16 @@ function getTiebreakValue(player: Player, criteria: TiebreakType): number {
       return player.tiebreaks.medianBuchholz;
     case 'buchholz-cut1':
       return player.tiebreaks.buchholzCut1;
+    case 'buchholz-second':
+      return player.tiebreaks.buchholzSecond;
     case 'sonneborn-berger':
       return player.tiebreaks.sonnebornBerger;
     case 'cumulative':
       return player.tiebreaks.cumulative;
     case 'direct-encounter':
       return player.tiebreaks.directEncounter;
+    case 'black-wins':
+      return player.tiebreaks.blackWins;
     case 'rating':
       return player.tiebreaks.rating;
     default:

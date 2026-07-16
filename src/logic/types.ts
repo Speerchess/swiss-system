@@ -4,9 +4,11 @@ export type TiebreakType =
   | 'buchholz'
   | 'median-buchholz'
   | 'buchholz-cut1'
+  | 'buchholz-second'
   | 'sonneborn-berger'
   | 'cumulative'
   | 'direct-encounter'
+  | 'black-wins'
   | 'rating';
 
 export type MatchResult = '1-0' | '0-1' | '1/2-1/2' | '0-0' | null;
@@ -24,9 +26,11 @@ export interface Player {
     buchholz: number;
     medianBuchholz: number;
     buchholzCut1: number;
+    buchholzSecond: number;
     sonnebornBerger: number;
     cumulative: number;
     directEncounter: number;
+    blackWins: number;
     rating: number;
   };
 }

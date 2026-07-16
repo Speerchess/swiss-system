@@ -16,9 +16,11 @@ const TIEBREAK_SHORT_NAMES: Record<TiebreakType, string> = {
   'buchholz': 'BucT',
   'median-buchholz': 'M-BH',
   'buchholz-cut1': 'Buc1',
+  'buchholz-second': 'Buc2',
   'sonneborn-berger': 'SB',
   'cumulative': 'CUM',
   'direct-encounter': 'DE',
+  'black-wins': 'BlkW',
   'rating': 'Rtg',
 };
 
@@ -26,9 +28,11 @@ const TIEBREAK_TOOLTIPS: Record<TiebreakType, string> = {
   'buchholz': 'Buchholz (상대방 점수의 합)',
   'median-buchholz': 'Median Buchholz (최고·최저 제외 상대 점수 합)',
   'buchholz-cut1': 'Buchholz Cut 1 (최저 1개 제외 상대 점수 합)',
+  'buchholz-second': 'Buchholz 2nd (상대방의 북홀츠 점수의 합)',
   'sonneborn-berger': 'Sonneborn-Berger (이긴 상대 점수 + 비긴 상대 점수×0.5)',
   'cumulative': 'Cumulative (라운드별 누적 점수의 합)',
   'direct-encounter': 'Direct Encounter (승자승)',
+  'black-wins': 'Black Wins (흑으로 이긴 판수)',
   'rating': 'Rating (본인 레이팅)',
 };
 
@@ -40,12 +44,16 @@ const getTiebreakValue = (player: Player, criteria: TiebreakType): number | unde
       return player.tiebreaks.medianBuchholz;
     case 'buchholz-cut1':
       return player.tiebreaks.buchholzCut1;
+    case 'buchholz-second':
+      return player.tiebreaks.buchholzSecond;
     case 'sonneborn-berger':
       return player.tiebreaks.sonnebornBerger;
     case 'cumulative':
       return player.tiebreaks.cumulative;
     case 'direct-encounter':
       return player.tiebreaks.directEncounter;
+    case 'black-wins':
+      return player.tiebreaks.blackWins;
     case 'rating':
       return player.tiebreaks.rating;
     default:
